@@ -52,7 +52,7 @@
 
 -- 5. Определите || через if
 
-\func \infixr 2 || (x y : Bool) : Bool => if x true (if y true false)
+\func \infixr 2 || (x y : Bool) : Bool => if x true y
 
 -- 6. Определите возведение в степень и факториал для натуральных чисел
 
@@ -60,7 +60,6 @@
 
 \func \infixr 8 ^ (x y : Nat) : Nat \elim y
   | 0 => 1
-  | 1 => x
   | suc y' => x * (x ^ y')
 
 \func fac (x : Nat) : Nat \elim x
