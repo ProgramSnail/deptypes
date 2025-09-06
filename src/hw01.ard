@@ -71,6 +71,12 @@
 
 \func mod (x y : Nat) => x - y * (x `div` y)
 
+\func modTest1 : mod 11 5 = 1 => idp
+\func modTest2 : mod 3 5 = 3 => idp
+\func modTest3 : mod 0 5 = 0 => idp
+\func modTest4 : mod 5 0 = 5 => idp
+\func modTest5 : mod 10 5 = 0 => idp
+
 \func gcd (x y : Nat) : Nat => gcd' (x + y) x y
     \where {
       \func gcd' (fuel x y : Nat) : Nat \elim fuel, x, y
@@ -79,3 +85,8 @@
         | 0, _, _ => 0
         | suc fuel', x, y => gcd' fuel' y (x `mod` y)
     }
+
+\func gcdTest1 : gcd 100 5 = 5 => idp
+\func gcdTest2 : gcd 5 100 = 5 => idp
+\func gcdTest3 : gcd 0 5 = 5 => idp
+\func gcdTest4 : gcd 5 0 = 5 => idp
