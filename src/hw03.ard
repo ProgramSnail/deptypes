@@ -83,6 +83,11 @@
 
 \func ldistr (n m k : Nat) : n * (m + k) = n * m + n * k => *-comm _ _ *> rdistr _ _ _ *> rewrite (*-comm n m) (rewrite (*-comm k n) idp)
 
+-- next lection solution
+\func ldistr' (n m k : Nat) : n * (m + k) = n * m + n * k \elim k
+  | 0 => idp
+  | suc m => pmap (`+ n) (ldistr' _ _ _) *> +-assoc _ _ _
+
 -- 6. Определите конгруэнтность для функций двух аргументов через transport
 --    Можно использовать любые функции, определенные через transport
 
