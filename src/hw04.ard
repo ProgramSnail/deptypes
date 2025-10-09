@@ -88,18 +88,9 @@
 --    Функция, преобразующая Vec A n в Fin n -> A, была реализована на лекции
 --    Реализуйте обратную функцию
 
-\func finFromNat (n : Nat) : Fin (suc n) \elim n
-  | 0 => fzero
-  | suc n => fsuc $ finFromNat n
-
-\func incFinMax {n : Nat} (k : Fin n) : Fin (suc n) \elim n, k
-  | suc n, fzero => fzero
-  | suc n, fsuc k => fsuc $ incFinMax k
-
 \func coin {A : \Type} {n : Nat} (f : Fin n -> A) : Vec A n \elim n
   | 0 => nil
-  | suc n => cons (f $ finFromNat n) $ coin (\lam k => f $ incFinMax k)
-
+  | suc n => cons (f fzero) $ coin (\lam k => f $ fsuc k)
 
 -- Optional task
 -- 8. Определите тип матриц и ряд функций над ними
@@ -114,7 +105,7 @@
   | suc n, fzero, fsuc y => false
   | suc n, fsuc x, fzero => false
 
-\func diag {A : \Type} (z e : A) (n : Nat) : Mat A n n => coin (\lam n => coin (\lam m => if (finEq n m) z e))
+\func diag {A : \Type} (z e : A) (n : Nat) : Mat A n n => coin (\lam n => coin (\lam m => if (finEq n m) e z))
 
 -- Транспонирование матриц
 
@@ -141,7 +132,7 @@
 
 -- 9. Определите факториал через Nat-rec
 
-\func fact (n : Nat) : Nat => Nat-rec Nat (suc 0) (\lam n acc => n * acc) n
+\func fact (n : Nat) : Nat => Nat-rec Nat (suc 0) (\lam n acc => suc n * acc) n
 
 -- 10. Докажите ассоциативность сложения для натуральных чисел через Nat-elim
 
@@ -157,19 +148,21 @@
 \func D-elim (P : D -> \Type)
              (c1 : \Pi (n : Nat) -> P (con1 n))
              (c2 : \Pi (y z : D) -> P y -> P z -> P (con2 y z))
-             (c3 : \Pi (f : Nat -> D) -> P (con3 f)) -- ??
+             (c3 : \Pi (g : Nat -> D) (f : \Pi (n : Nat) -> P (g n)) -> P (con3 g))
              (x : D) : P x
 \elim x
   | con1 n => c1 n
   | con2 y z => c2 y z (D-elim P c1 c2 c3 y) (D-elim P c1 c2 c3 z)
-  | con3 f => c3 f
+  | con3 f => c3 f (\lam n => D-elim P c1 c2 c3 (f n))
 
 \func D-rec (P : \Type)
-             (c1 : \Pi (n : Nat) -> P)
-             (c2 : D -> D -> P -> P -> P)
-             (c3 : (Nat -> D) -> P)
-             (x : D) : P
+            (c1 : \Pi (n : Nat) -> P)
+            (c2 : D -> D -> P -> P -> P)
+            (c3 : (Nat -> D) -> (Nat -> P) -> P)
+            (x : D) : P
 => D-elim (\lam _ => P) c1 c2 c3 x
+
+\func fooByDRec (d : D) : Nat => D-rec Nat (\lam n => n) (\lam _ _ x1 x2 => x1 Nat.+ x2) (\lam _ f => f (f 100)) d
 
 {- Для проверки, что определения D-elim и D-rec верные, вы можете попробовать определить foo через D-rec
 \func foo (d : D) : Nat
