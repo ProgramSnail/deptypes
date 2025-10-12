@@ -8,7 +8,7 @@
 
 -- 1. Определите функцию swap и докажите, что swap (swap p) = p
 
-\func swap {A B : \Type} (p : \Sigma A B) : \Sigma B A \elim
+\func swap {A B : \Type} (p : \Sigma A B) : \Sigma B A
   | (a,b) => (b, a)
 
 \func swap-involutive {A B : \Type} (p : \Sigma A B) : swap (swap p) = p => idp
