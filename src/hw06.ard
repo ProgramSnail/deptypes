@@ -1,29 +1,46 @@
+\import Data.Bool
+\import Data.Maybe
+\import Function.Meta
 \import Logic
+\import Meta
+\import Paths
+\import hw01 (gcd)
 \import lect06
 
 -- 1. Определите функцию swap несколькими способами
 
 -- При помощи \cowith и доступа к полям
-\func swap {A B : \Type} (p : Pair A B) : Pair B A => {?}
+\func swap {A B : \Type} (p : Pair A B) : Pair B A \cowith
+  | fst_ => Pair.snd_ {p}
+  | snd_ => Pair.fst_ {p}
 
 -- При помощи \new и паттерн матчинга
-\func swap' {A B : \Type} (p : Pair A B) : Pair B A => {?}
+\func swap' {A B : \Type} (p : Pair A B) : Pair B A \elim p
+  | (a,b) => \new Pair { | fst_ => b | snd_ => a }
 
 -- При помощи \new и доступа к полям
-\func swap'' {A B : \Type} (p : Pair A B) : Pair B A => {?}
+\func swap'' {A B : \Type} (p : Pair A B) : Pair B A => \new Pair { | fst_ => Pair.snd_ {p} | snd_ => Pair.fst_ {p} }
 
 -- 2. Докажите, что swap (swap p) = p
 
-\func swap-involutive {A B : \Type} (p : Pair A B) : swap (swap p) = p => {?}
+\func swap-involutive {A B : \Type} (p : Pair A B) : swap (swap p) = p => idp
 
 -- 3. Докажите, что тип PosNat 0 пустой, а тип PosNat 1 нет
 
-\func zero-isNotPos (p : PosNat 0) : Empty => {?}
+\func zero-isNotPos (p : PosNat 0) : Empty => PosNat.p {p}
 
-\func one-isPos : PosNat 1 => {?}
+\func one-isPos : PosNat 1 => \new PosNat { | p => So.toSo idp }
 
 -- 4. Определите \record, состоящий из пар взаимно простых натуральных чисел
 --    Определите тип, состоящий из натуральных чисел, взаимно простых с 60
+
+\record RelPrime
+  | n : Nat
+  | m : Nat
+  | p : gcd n m = 1
+
+\data RelPrimeWith60 (n : Nat)
+  | r (RelPrime n 60)
 
 -- 5. Закончите определение класса монад
 --    Этот класс должен содержать все монадные законы и реализовывать все поля из класса функторов
@@ -31,13 +48,134 @@
 \class Monad \extends Functor
   | return {A : \Type} : A -> F A
   | \infixl 2 >>= {A B : \Type} : F A -> (A -> F B) -> F B
+  | monad-left-id {A B : \Type} (a : A) (h : A -> F B) : (return a >>= h) = h a
+  | monad-right-id {A : \Type} (m : F A) : (m >>= (\lam (a : A) => return a)) = m
+  | monad-assoc {A B C : \Type} (m : F A) (g : A -> F B) (h : B -> F C) : ((m >>= g) >>= h) = (m >>= (\lam x => g x >>= h))
 
 -- 6. Определите \instance Monad для Maybe
+
+\instance MaybeMonad : Monad Maybe
+  | fmap {A B : \Type} (f : A -> B) (x : Maybe A) : Maybe B \elim x {
+    | nothing => nothing
+    | just a => just $ f a
+  }
+  | fmap-id {A : \Type} (x : Maybe A) : fmap (\lam a => a) x = x \elim x {
+    | nothing => idp
+    | just a => idp
+  }
+  | fmap-comp {A B C : \Type} (f : B -> C) (g : A -> B) (x : Maybe A)
+  : fmap (\lam a => f (g a)) x = fmap f (fmap g x) \elim x {
+    | nothing => idp
+    | just a => idp
+  }
+  | return {A : \Type} (a : A) : Maybe A => just a
+  | >>= {A B : \Type} (x : Maybe A) (f : A -> Maybe B) : Maybe B \elim x {
+    | nothing => nothing {B}
+    | just a => f a
+  }
+  | monad-left-id {A B : \Type} (a : A) (h : A -> Maybe B) : (return a >>= h) = h a => idp
+  | monad-right-id {A : \Type} (m : Maybe A) : (m >>= (\lam (a : A) => return a)) = m \elim m {
+    | nothing => idp
+    | just a => idp
+  }
+  | monad-assoc {A B C : \Type} (m : Maybe A) (g : A -> Maybe B) (h : B -> Maybe C) : ((m >>= g) >>= h) = (m >>= (\lam x => g x >>= h)) \elim m {
+    | nothing => idp
+    | just a => idp
+  }
 
 -- 7. Определите \instance Monad для State и State'
 
 \record State (S A : \Type)
   | state : S -> \Sigma S A
 
+\instance StateMonad (S : \Type) : Monad (State S)
+  | fmap {A B : \Type} (f : A -> B) (x : State S A) : State S B => \new State { | state => \lam s => \case State.state {x} s \with {
+    | (s, a) => (s, f a)
+  }} -- or \new State { | state => \lam s => (s, f (State.state {x} s).2) }
+  | fmap-id {A : \Type} (x : State S A) : fmap (\lam a => a) x = x => idp
+  | fmap-comp {A B C : \Type} (f : B -> C) (g : A -> B) (x : State S A)
+  : fmap (\lam a => f (g a)) x = fmap f (fmap g x) => idp
+  | return {A : \Type} (a : A) : State S A => \new State { | state => \lam s => (s, a) }
+  | >>= {A B : \Type} (x : State S A) (f : A -> State S B) : State S B => \new State { | state => \lam s => \case State.state {x} s \with {
+    | (s, a) => State.state {f a} s
+  }}
+  | monad-left-id {A B : \Type} (a : A) (h : A -> State S B) : (return a >>= h) = h a => idp
+  | monad-right-id {A : \Type} (m : State S A) : (m >>= (\lam (a : A) => return a)) = m => idp
+  | monad-assoc {A B C : \Type} (m : State S A) (g : A -> State S B) (h : B -> State S C) : ((m >>= g) >>= h) = (m >>= (\lam x => g x >>= h)) => idp
+
 \data State' (S A : \Type)
   | state' (S -> \Sigma S A)
+
+\func stateFunExt {A S : \Type} {f g : S -> \Sigma S A}
+             (p : \Pi (s : S) -> f s = g s) : f = g
+  => \lam i a => p a i
+
+\func sigmaFmap {A B S : \Type} (f : A -> B) (x : \Sigma S A) : \Sigma S B \elim x
+ | (s, a) => (s, f a)
+\func sigmaFmap' {A B S : \Type} (f : A -> State' S B) (x : \Sigma S A) : \Sigma S B \elim x
+  | (s, a) => stateApply (f a) s
+  -- (stateToFunc f) a s
+
+-- \func stateUnwrap {A S : \Type} (s : S) (x : \Sigma S (State' S A)) : \Sigma S A \elim x {
+--   | (_, state' f) => f s
+-- }
+
+\func stateApply {A S : \Type} (x : State' S A) (s : S) : \Sigma S A \elim x
+  | state' f => f s
+
+\func stateFunc {A S : \Type} (x : State' S A) : S -> \Sigma S A \elim x
+  | state' f => f
+
+\func stateApplyUnwrap {A S : \Type} (f : S -> \Sigma S A) : stateApply (state' f) = f => idp
+\func stateApplyUnwrap' {A S : \Type} (x : State' S A) : state' (stateApply x) = x \elim x
+  | state' f => pmap state' $ stateApplyUnwrap f
+
+\func stateToFunc {A B S : \Type} (x : A -> State' S B) : A -> S -> \Sigma S B => \lam a => stateFunc $ x a
+\func stateFromFunc {A B S : \Type} (f : A -> S -> \Sigma S B) : A -> State' S B => \lam a => state' $ f a
+-- \func sigmaEtaReduce {A S : \Type} (f : S -> \Sigma S A) : (\lam s => ((f s).1, (f s).2)) = f => idp
+
+\instance StateMonad' (S : \Type) : Monad (State' S)
+   | fmap {A B : \Type} (f : A -> B) (x : State' S A) : State' S B \elim x {
+     | state' g => state' $ \lam s => sigmaFmap f (g s)
+   }
+   | fmap-id {A : \Type} (x : State' S A) : fmap (\lam a => a) x = x \elim x {
+     | state' f => idp
+   }
+   | fmap-comp {A B C : \Type} (f : B -> C) (g : A -> B) (x : State' S A)
+   : fmap (\lam a => f (g a)) x = fmap f (fmap g x) \elim x {
+     | state' f => idp
+   }
+   | return {A : \Type} (a : A) : State' S A => state' $ \lam s => (s, a)
+   | >>= {A B : \Type} (x : State' S A) (f : A -> State' S B) : State' S B \elim x {
+     | state' g => state' $ \lam s => sigmaFmap' f (g s) -- stateUnwrap s $ sigmaFmap f (g s)
+   }
+   | monad-left-id {A B : \Type} (a : A) (h : A -> State' S B) : (return a >>= h) = h a => stateApplyUnwrap' $ h a
+   | monad-right-id {A : \Type} (m : State' S A) : (m >>= (\lam (a : A) => return a)) = m \elim m {
+     | state' f => pmap state' idp -- sigmaEtaReduce f
+   }
+   | monad-assoc {A B C : \Type} (m : State' S A) (g : A -> State' S B) (h : B -> State' S C) : ((m >>= g) >>= h) = (m >>= (\lam x => g x >>= h)) \elim m {
+     | state' f => pmap state' {?}
+   }
+
+-- \func helper {A B C S : \Type} (m : State' S A) (g : A -> State' S B) (h : B -> State' S C) \elim m
+--  | state' f => sigmaAssocHelperFunc f (stateToFunc g) (stateToFunc h)
+-- \func helper' {A B C S : \Type} (f : S -> \Sigma S A) (g : A -> State' S B) (h : B -> State' S C) : (((state' f) >>= g) >>= h) = ((state' f) >>= (\lam x => g x >>= h))
+--  => {?}  -- sigmaAssocHelperFunc' f (stateToFunc g) (stateToFunc h)
+
+-- with state relaced by direct application:
+\func uncurryFlip {A B C : \Type} (f : B -> A -> C) (x : \Sigma A B) : C \elim x
+  | (a, b) => f b a
+\func \infixl 2 >>=' {A B S : \Type} (g : S -> \Sigma S A) (f : A -> S -> \Sigma S B) : S -> \Sigma S B => \lam s => uncurryFlip f $ g s
+\func sigmaAssocHelperFunc {A B C S : \Type} (f : S -> \Sigma S A) (g : A -> S -> \Sigma S B) (h : B -> S -> \Sigma S C) (s : S)
+  : (h ((g (f s).2) (f s).1).2) ((g (f s).2) (f s).1).1 = (g (f s).2 >>=' h) (f s).1
+  => idp
+\func sigmaAssocHelperFunc' {A B C S : \Type} (f : S -> \Sigma S A) (g : A -> S -> \Sigma S B) (h : B -> S -> \Sigma S C) (s : S)
+  : ((f >>=' g) >>=' h) = (f >>=' (\lam x => g x >>=' h))
+  => idp
+
+\func sigmaAssocHelper {A B C S : \Type} (f : S -> \Sigma S A) (g : A -> State' S B) (h : B -> State' S C) (s : S)
+  : stateApply (h (stateApply (g (f s).2) (f s).1).2) (stateApply (g (f s).2) (f s).1).1 = stateApply (g (f s).2 >>= h) (f s).1
+  => {?}
+\func sigmaAssocHelper' {A B C S : \Type} (f : S -> \Sigma S A) (g : A -> State' S B) (h : B -> State' S C)
+  : (\lam s => stateApply (h (stateApply (g (f s).2) (f s).1).2) (stateApply (g (f s).2) (f s).1).1) = (\lam s => stateApply (g (f s).2 >>= h) (f s).1)
+  => {?}
