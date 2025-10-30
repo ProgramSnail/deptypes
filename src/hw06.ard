@@ -5,6 +5,7 @@
 \import Meta
 \import Paths
 \import hw01 (gcd)
+\import lect05 (funExt)
 \import lect06
 
 -- 1. Определите функцию swap несколькими способами
@@ -106,33 +107,17 @@
 \data State' (S A : \Type)
   | state' (S -> \Sigma S A)
 
-\func stateFunExt {A S : \Type} {f g : S -> \Sigma S A}
-             (p : \Pi (s : S) -> f s = g s) : f = g
-  => \lam i a => p a i
-
 \func sigmaFmap {A B S : \Type} (f : A -> B) (x : \Sigma S A) : \Sigma S B \elim x
  | (s, a) => (s, f a)
 \func sigmaFmap' {A B S : \Type} (f : A -> State' S B) (x : \Sigma S A) : \Sigma S B \elim x
   | (s, a) => stateApply (f a) s
-  -- (stateToFunc f) a s
-
--- \func stateUnwrap {A S : \Type} (s : S) (x : \Sigma S (State' S A)) : \Sigma S A \elim x {
---   | (_, state' f) => f s
--- }
 
 \func stateApply {A S : \Type} (x : State' S A) (s : S) : \Sigma S A \elim x
   | state' f => f s
 
-\func stateFunc {A S : \Type} (x : State' S A) : S -> \Sigma S A \elim x
-  | state' f => f
-
 \func stateApplyUnwrap {A S : \Type} (f : S -> \Sigma S A) : stateApply (state' f) = f => idp
 \func stateApplyUnwrap' {A S : \Type} (x : State' S A) : state' (stateApply x) = x \elim x
   | state' f => pmap state' $ stateApplyUnwrap f
-
-\func stateToFunc {A B S : \Type} (x : A -> State' S B) : A -> S -> \Sigma S B => \lam a => stateFunc $ x a
-\func stateFromFunc {A B S : \Type} (f : A -> S -> \Sigma S B) : A -> State' S B => \lam a => state' $ f a
--- \func sigmaEtaReduce {A S : \Type} (f : S -> \Sigma S A) : (\lam s => ((f s).1, (f s).2)) = f => idp
 
 \instance StateMonad' (S : \Type) : Monad (State' S)
    | fmap {A B : \Type} (f : A -> B) (x : State' S A) : State' S B \elim x {
@@ -147,35 +132,16 @@
    }
    | return {A : \Type} (a : A) : State' S A => state' $ \lam s => (s, a)
    | >>= {A B : \Type} (x : State' S A) (f : A -> State' S B) : State' S B \elim x {
-     | state' g => state' $ \lam s => sigmaFmap' f (g s) -- stateUnwrap s $ sigmaFmap f (g s)
+     | state' g => state' $ \lam s => sigmaFmap' f (g s)
    }
    | monad-left-id {A B : \Type} (a : A) (h : A -> State' S B) : (return a >>= h) = h a => stateApplyUnwrap' $ h a
    | monad-right-id {A : \Type} (m : State' S A) : (m >>= (\lam (a : A) => return a)) = m \elim m {
-     | state' f => pmap state' idp -- sigmaEtaReduce f
+     | state' f => pmap state' idp
    }
    | monad-assoc {A B C : \Type} (m : State' S A) (g : A -> State' S B) (h : B -> State' S C) : ((m >>= g) >>= h) = (m >>= (\lam x => g x >>= h)) \elim m {
-     | state' f => pmap state' {?}
+     | state' f => pmap state' $ funExt $ \lam s => monad-assoc' f (g (f s).2) h s
+   } \where {
+     \func monad-assoc' {S A B C : \Type} (f : S -> \Sigma S A) (m : State' S B) (h : B -> State' S C) (s : S)
+       : stateApply (h (stateApply m (f s).1).2) (stateApply m (f s).1).1 = stateApply (m >>= h) (f s).1 \elim m
+       | state' g => idp
    }
-
--- \func helper {A B C S : \Type} (m : State' S A) (g : A -> State' S B) (h : B -> State' S C) \elim m
---  | state' f => sigmaAssocHelperFunc f (stateToFunc g) (stateToFunc h)
--- \func helper' {A B C S : \Type} (f : S -> \Sigma S A) (g : A -> State' S B) (h : B -> State' S C) : (((state' f) >>= g) >>= h) = ((state' f) >>= (\lam x => g x >>= h))
---  => {?}  -- sigmaAssocHelperFunc' f (stateToFunc g) (stateToFunc h)
-
--- with state relaced by direct application:
-\func uncurryFlip {A B C : \Type} (f : B -> A -> C) (x : \Sigma A B) : C \elim x
-  | (a, b) => f b a
-\func \infixl 2 >>=' {A B S : \Type} (g : S -> \Sigma S A) (f : A -> S -> \Sigma S B) : S -> \Sigma S B => \lam s => uncurryFlip f $ g s
-\func sigmaAssocHelperFunc {A B C S : \Type} (f : S -> \Sigma S A) (g : A -> S -> \Sigma S B) (h : B -> S -> \Sigma S C) (s : S)
-  : (h ((g (f s).2) (f s).1).2) ((g (f s).2) (f s).1).1 = (g (f s).2 >>=' h) (f s).1
-  => idp
-\func sigmaAssocHelperFunc' {A B C S : \Type} (f : S -> \Sigma S A) (g : A -> S -> \Sigma S B) (h : B -> S -> \Sigma S C) (s : S)
-  : ((f >>=' g) >>=' h) = (f >>=' (\lam x => g x >>=' h))
-  => idp
-
-\func sigmaAssocHelper {A B C S : \Type} (f : S -> \Sigma S A) (g : A -> State' S B) (h : B -> State' S C) (s : S)
-  : stateApply (h (stateApply (g (f s).2) (f s).1).2) (stateApply (g (f s).2) (f s).1).1 = stateApply (g (f s).2 >>= h) (f s).1
-  => {?}
-\func sigmaAssocHelper' {A B C S : \Type} (f : S -> \Sigma S A) (g : A -> State' S B) (h : B -> State' S C)
-  : (\lam s => stateApply (h (stateApply (g (f s).2) (f s).1).2) (stateApply (g (f s).2) (f s).1).1) = (\lam s => stateApply (g (f s).2 >>= h) (f s).1)
-  => {?}
