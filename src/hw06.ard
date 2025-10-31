@@ -4,6 +4,7 @@
 \import Logic
 \import Meta
 \import Paths
+\import Paths.Meta
 \import hw01 (gcd)
 \import lect05 (funExt)
 \import lect06
@@ -40,35 +41,41 @@
   | m : Nat
   | p : gcd n m = 1
 
-\data RelPrimeWith60 (n : Nat)
-  | r (RelPrime n 60)
+\func RelPrimeWith60 (n : Nat) : \Type => (RelPrime n 60)
 
 -- 5. Закончите определение класса монад
 --    Этот класс должен содержать все монадные законы и реализовывать все поля из класса функторов
 
-\class Monad \extends Functor
+\class Monad \extends Functor {
   | return {A : \Type} : A -> F A
   | \infixl 2 >>= {A B : \Type} : F A -> (A -> F B) -> F B
   | monad-left-id {A B : \Type} (a : A) (h : A -> F B) : (return a >>= h) = h a
   | monad-right-id {A : \Type} (m : F A) : (m >>= (\lam (a : A) => return a)) = m
   | monad-assoc {A B C : \Type} (m : F A) (g : A -> F B) (h : B -> F C) : ((m >>= g) >>= h) = (m >>= (\lam x => g x >>= h))
+  | fmap f x => x >>= (\lam a => return $ f a)
+  | fmap-id {A : \Type} (x : F A) => monad-right-id x
+  | fmap-comp {A B C : \Type} (f : B -> C) (g : A -> B) (x : F A)
+    => \have | p : (\lam (a : A) => return (f (g a))) = (\lam (x : A) => return (g x) >>= (\lam (a : B) => return (f a)))
+               => funExt $ \lam a => rewrite (monad-left-id (g a) (\lam a => return (f a))) idp \in
+       unfold fmap $ rewrite p $  inv $ monad-assoc x (\lam a => return $ g a) (\lam a => return $ f a)
+}
 
 -- 6. Определите \instance Monad для Maybe
 
 \instance MaybeMonad : Monad Maybe
-  | fmap {A B : \Type} (f : A -> B) (x : Maybe A) : Maybe B \elim x {
-    | nothing => nothing
-    | just a => just $ f a
-  }
-  | fmap-id {A : \Type} (x : Maybe A) : fmap (\lam a => a) x = x \elim x {
-    | nothing => idp
-    | just a => idp
-  }
-  | fmap-comp {A B C : \Type} (f : B -> C) (g : A -> B) (x : Maybe A)
-  : fmap (\lam a => f (g a)) x = fmap f (fmap g x) \elim x {
-    | nothing => idp
-    | just a => idp
-  }
+--   | fmap {A B : \Type} (f : A -> B) (x : Maybe A) : Maybe B \elim x {
+--     | nothing => nothing
+--     | just a => just $ f a
+--   }
+--   | fmap-id {A : \Type} (x : Maybe A) : fmap (\lam a => a) x = x \elim x {
+--     | nothing => idp
+--     | just a => idp
+--   }
+--   | fmap-comp {A B C : \Type} (f : B -> C) (g : A -> B) (x : Maybe A)
+--   : fmap (\lam a => f (g a)) x = fmap f (fmap g x) \elim x {
+--     | nothing => idp
+--     | just a => idp
+--   }
   | return {A : \Type} (a : A) : Maybe A => just a
   | >>= {A B : \Type} (x : Maybe A) (f : A -> Maybe B) : Maybe B \elim x {
     | nothing => nothing {B}
@@ -90,12 +97,12 @@
   | state : S -> \Sigma S A
 
 \instance StateMonad (S : \Type) : Monad (State S)
-  | fmap {A B : \Type} (f : A -> B) (x : State S A) : State S B => \new State { | state => \lam s => \case State.state {x} s \with {
-    | (s, a) => (s, f a)
-  }} -- or \new State { | state => \lam s => (s, f (State.state {x} s).2) }
-  | fmap-id {A : \Type} (x : State S A) : fmap (\lam a => a) x = x => idp
-  | fmap-comp {A B C : \Type} (f : B -> C) (g : A -> B) (x : State S A)
-  : fmap (\lam a => f (g a)) x = fmap f (fmap g x) => idp
+--   | fmap {A B : \Type} (f : A -> B) (x : State S A) : State S B => \new State { | state => \lam s => \case State.state {x} s \with {
+--     | (s, a) => (s, f a)
+--   }} -- or \new State { | state => \lam s => (s, f (State.state {x} s).2) }
+--   | fmap-id {A : \Type} (x : State S A) : fmap (\lam a => a) x = x => idp
+--   | fmap-comp {A B C : \Type} (f : B -> C) (g : A -> B) (x : State S A)
+--   : fmap (\lam a => f (g a)) x = fmap f (fmap g x) => idp
   | return {A : \Type} (a : A) : State S A => \new State { | state => \lam s => (s, a) }
   | >>= {A B : \Type} (x : State S A) (f : A -> State S B) : State S B => \new State { | state => \lam s => \case State.state {x} s \with {
     | (s, a) => State.state {f a} s
@@ -120,16 +127,16 @@
   | state' f => pmap state' $ stateApplyUnwrap f
 
 \instance StateMonad' (S : \Type) : Monad (State' S)
-   | fmap {A B : \Type} (f : A -> B) (x : State' S A) : State' S B \elim x {
-     | state' g => state' $ \lam s => sigmaFmap f (g s)
-   }
-   | fmap-id {A : \Type} (x : State' S A) : fmap (\lam a => a) x = x \elim x {
-     | state' f => idp
-   }
-   | fmap-comp {A B C : \Type} (f : B -> C) (g : A -> B) (x : State' S A)
-   : fmap (\lam a => f (g a)) x = fmap f (fmap g x) \elim x {
-     | state' f => idp
-   }
+--    | fmap {A B : \Type} (f : A -> B) (x : State' S A) : State' S B \elim x {
+--      | state' g => state' $ \lam s => sigmaFmap f (g s)
+--    }
+--    | fmap-id {A : \Type} (x : State' S A) : fmap (\lam a => a) x = x \elim x {
+--      | state' f => idp
+--    }
+--    | fmap-comp {A B C : \Type} (f : B -> C) (g : A -> B) (x : State' S A)
+--    : fmap (\lam a => f (g a)) x = fmap f (fmap g x) \elim x {
+--      | state' f => idp
+--    }
    | return {A : \Type} (a : A) : State' S A => state' $ \lam s => (s, a)
    | >>= {A B : \Type} (x : State' S A) (f : A -> State' S B) : State' S B \elim x {
      | state' g => state' $ \lam s => sigmaFmap' f (g s)
