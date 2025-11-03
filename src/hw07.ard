@@ -1,5 +1,5 @@
 \import Data.Bool
-\import Data.List (List, length)
+\import Data.List (List, headDef, length, tail)
 \import Data.Or
 \import Function.Meta
 \import Logic
@@ -126,11 +126,7 @@
 
 \func isEven (n : Nat) => \Sigma (k : Nat) (n = 2 * k)
 
-\func unsuc (n : Nat) : Nat \elim n
- | 0 => 0
- | suc n => n
-
-\func unsucIsEvenHelper (n k : Nat) (p : suc (suc n) = 2 * suc k) : n = 2 * k => pmap unsuc $ pmap unsuc $ p
+\func isEvenPredHelper (n k : Nat) (p : suc (suc n) = 2 * suc k) : n = 2 * k => pmap pred $ pmap pred $ p
 
 \func isEven-dec' (n : Nat) : Decide (\Sigma (k : Nat) (n = 2 * k)) \elim n
   | 0 => yes (0, idp)
@@ -143,7 +139,7 @@
     | no nf => no $ \lam (k, p) => cases (k arg addPath, nf) \with {
       | 0, p', _ => \case rewrite p' p
       | suc k, p', nf => cases (rewrite p' p) \with {
-        | p => nf (k, unsucIsEvenHelper n k p)
+        | p => nf (k, isEvenPredHelper n k p)
       }
     }
   }
@@ -151,14 +147,6 @@
 \func isEven-dec : DecPred isEven => isEven-dec' __
 
 -- 10. Докажите, что если равенство элементов A разрешимо, то и равенство элементов List A тоже разрешимо
-
-\func head {A : \Type} (default : A) (xs : List A) : A \elim xs
-  | List.nil => default
-  | x List.:: xs => x
-
-\func tail {A : \Type} (xs : List A) : List A \elim xs
-  | List.nil => List.nil
-  | x List.:: xs => xs
 
 \func ListEq' {A : \Type} (dec : Eq A) (xs ys : List A) : Decide (xs = ys) \elim xs, ys
   | List.nil, List.nil => yes idp
@@ -169,7 +157,7 @@
       | yes pxs => yes $ rewriteI px $ pmap (List.:: x) pxs
       | no nf => no $ \lam p => nf (pmap tail p)
     }
-    | no nf => no $ \lam p => nf (pmap (head x) p)
+    | no nf => no $ \lam p => nf (pmap (headDef x) p)
   }
 
 \instance ListEq {A : \Type} (dec : Eq A) : Eq (List A)
