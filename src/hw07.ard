@@ -1,14 +1,26 @@
 \import Data.Bool
 \import Data.List (List, length)
+\import Data.Or
+\import Function.Meta
 \import Logic
+\import Meta
+\import Paths
+\import Paths.Meta
+\import lect05 (funExt)
 \import lect07
 \open Nat(+,*)
 
 
 -- 1. Определите предикат принадлежности элемента списку
 
-\data In {A : \Type} (a : A) (xs : List A)
+\data In {A : \Type} (a : A) (xs : List A) \with
+  | a, x List.:: xs => in-ctr (Or (a = x) (In a xs))
+  | a, List.nil => Empty
 
+-- another approach => no proofs inside
+-- \func inPred {A : \Type} {eq : Eq A} (a : A) (xs : List A) : \Type
+--   | a, x List.:: xs \as xs' => if (a Eq.== x) (In a xs') (In a xs)
+--   | a, List.nil => Empty
 
 -- Optional:
 -- 2. Докажите эквивалентность четырех различных определений LessOrEq: lessOrEq, lessOrEq', LessOrEq и LessOrEq'
@@ -18,52 +30,160 @@
 --    То есть ReflTransClosure R -- это минимальное рефлексивное и транзитивное отношение, содержащее R
 
 \data ReflTransClosure {A : \Type} (R : A -> A -> \Type) (x y : A)
-
+ | cls-by-trans (z : A) (ReflTransClosure R x z) (ReflTransClosure R z y)
+ | cls-by-refl (x = y)
+ | cls-by-R (R x y) -- ??
 
 -- 4. Докажите, что если R уже рефлексивно и транзитивно, то ReflTransClosure R эквивалентно R
 
 \func \infix 4 <-> (A B : \Type) => \Sigma (A -> B) (B -> A)
 
+\func ReflTransClosure-lem' {A : \Type} (R : A -> A -> \Type)
+                            (refl : \Pi (x : A) -> R x x)
+                            (trans : \Pi (x y z : A) -> R x y -> R y z -> R x z)
+                            (x y : A)
+                            (cls : ReflTransClosure R x y) : R x y \elim cls
+  | cls-by-trans z cls-x cls-y => \have | rx : R x z => ReflTransClosure-lem' R refl trans x z cls-x
+                                        | ry : R z y => ReflTransClosure-lem' R refl trans z y cls-y
+                                      \in trans x z y rx ry
+  | cls-by-refl p => rewriteI p $ refl x
+  | cls-by-R r => r
+
 \func ReflTransClosure-lem {A : \Type} (R : A -> A -> \Type)
                            (refl : \Pi (x : A) -> R x x)
                            (trans : \Pi (x y z : A) -> R x y -> R y z -> R x z)
   : \Pi (x y : A) -> R x y <-> ReflTransClosure R x y
-  => {?}
-
+  => \lam x y => (\lam r => cls-by-R r, \lam clj => ReflTransClosure-lem' R refl trans x y clj)
 
 -- 5. Определите предикат Sublist xs ys на списках, означающий "список xs является подсписком ys"
 
+-- for subl like usbstr version (not subseq)
+-- \data SublistPrefix {A : \Type} (xs ys : List A) \elim xs, ys
+--   | List.nil, _ => subl-prefix-nil
+--   | x List.:: xs, y List.:: ys => subl-prefix-cons (\Sigma (x = y) (SublistPrefix xs ys))
+
+\data Sublist {A : \Type} (xs ys : List A) \elim xs, ys
+  | List.nil, _ => subl-nil
+  | x List.:: xs, y List.:: ys => subl-match (x = y) (Sublist xs ys)
+  | xs, _ List.:: ys => subl-tail (Sublist xs ys)
 
 -- 6. Докажите, что Sublist (filter p xs) xs для любых p и xs
 
+\func sublist-filter-lem {A : \Type} (p : A -> Bool) (xs : List A) : Sublist (filter p xs) xs \elim xs
+  | List.nil => subl-nil
+  | a List.:: as \as xs => cases (p a) \with {
+    | true => subl-match idp (sublist-filter-lem p as)
+    | false => subl-tail (sublist-filter-lem p as)
+  }
 
 -- 7. Определите filter через if, а не через \case
 --    Докажите для этой версии filter лемму filter-lem
 
-\func filter' {A : \Type} (p : A -> Bool) (xs : List A) : List A => {?}
+\func filter' {A : \Type} (p : A -> Bool) (xs : List A) : List A \elim xs
+  | List.nil => List.nil
+  | x List.:: xs => if (p x) (x List.:: filter' p xs) (filter' p xs)
 
-\func filter-lem {A : \Type} (p : A -> Bool) (xs : List A) : LessOrEq (length (filter' p xs)) (length xs) => {?}
+\func if-helper {A : \Type} (b : Bool)
+                (valThen valElse : A)
+                (Container : A -> \Type)
+                (term-out : if b (Container valThen) (Container valElse))
+  : Container (if b valThen valElse) \elim b
+  | false => term-out
+  | true => term-out
 
+\func filter-lem' {A : \Type} (p : A -> Bool) (xs : List A) : LessOrEq (length (filter' p xs)) (length xs) \elim xs
+  | List.nil => zero<=_
+  | x List.:: xs => if-helper (p x)
+                              (x Data.List.:: filter' p xs) (filter' p xs)
+                              (\lam n => LessOrEq (length n) (suc (length xs)))
+    $ cases (p x)
+  \with {
+    | false => <=-helper $ filter-lem' p xs
+    | true => suc<=suc $ filter-lem' p xs
+  }
 
 -- 8. Закончите определение функции \func BoolFuncLem (f : Bool -> Bool) (x : Bool) : f (f (f x)) = f x из лекции
 
+\func BoolFuncLem (f : Bool -> Bool) (x : Bool) : f (f (f x)) = f x
+  => cases (f x arg addPath, f true arg addPath, f false arg addPath) \with {
+    | false, p, false, p1, false, p2 => rewrite (p2, p2) idp
+    | false, p, false, p1, true, p2 => rewrite (p2, p1) idp
+    | false, p, true, p1, false, p2 => rewrite (p2, p2) idp
+    | false, p, true, p1, true, p2 => \case x \as y, p : f y = false \return f (f false) = false \with {
+      | false, p3 => \case inv p3 *> p2
+      | true, p3 => \case inv p3 *> p1
+    }
+    | true, p, false, p1, false, p2 => cases (x, p) \with {
+      | false, p => \case inv p *> p2
+      | true, p => \case inv p *> p1
+    }
+    | true, p, false, p1, true, p2 => rewrite (p1, p2) idp
+    | true, p, true, p1, false, p2 => rewrite (p1, p1) idp
+    | true, p, true, p1, true, p2 => rewrite (p1, p1) idp
+  }
 
 -- 9. Докажите, что предикат isEven разрешим
 
 \func isEven (n : Nat) => \Sigma (k : Nat) (n = 2 * k)
 
-\func isEven-dec : DecPred isEven => {?}
+\func unsuc (n : Nat) : Nat \elim n
+ | 0 => 0
+ | suc n => n
 
+\func unsucIsEvenHelper (n k : Nat) (p : suc (suc n) = 2 * suc k) : n = 2 * k => pmap unsuc $ pmap unsuc $ p
+
+\func isEven-dec' (n : Nat) : Decide (\Sigma (k : Nat) (n = 2 * k)) \elim n
+  | 0 => yes (0, idp)
+  | 1 => no $ \lam (k, p) => cases (k arg addPath) \with {
+    | 0, p' => \case rewrite p' p
+    | suc k', p' => \case rewrite p' p
+  }
+  | suc (suc n) => cases (isEven-dec' n) \with {
+    | yes (k, p) => yes (suc k, pmap (\lam x => suc (suc x)) p)
+    | no nf => no $ \lam (k, p) => cases (k arg addPath, nf) \with {
+      | 0, p', _ => \case rewrite p' p
+      | suc k, p', nf => cases (rewrite p' p) \with {
+        | p => nf (k, unsucIsEvenHelper n k p)
+      }
+    }
+  }
+
+\func isEven-dec : DecPred isEven => isEven-dec' __
 
 -- 10. Докажите, что если равенство элементов A разрешимо, то и равенство элементов List A тоже разрешимо
 
-\instance ListEq {A : \Type} (dec : Eq A) : Eq (List A)
-  | decideEq => {?}
+\func head {A : \Type} (default : A) (xs : List A) : A \elim xs
+  | List.nil => default
+  | x List.:: xs => x
 
+\func tail {A : \Type} (xs : List A) : List A \elim xs
+  | List.nil => List.nil
+  | x List.:: xs => xs
+
+\func ListEq' {A : \Type} (dec : Eq A) (xs ys : List A) : Decide (xs = ys) \elim xs, ys
+  | List.nil, List.nil => yes idp
+  | List.nil, y List.:: ys => no $ \lam p => \case p
+  | x List.:: xs, List.nil => no $ \lam p => \case p
+  | x List.:: xs, y List.:: ys => cases (decideEq x y) \with {
+    | yes px => cases (ListEq' dec xs ys) \with {
+      | yes pxs => yes $ rewriteI px $ pmap (List.:: x) pxs
+      | no nf => no $ \lam p => nf (pmap tail p)
+    }
+    | no nf => no $ \lam p => nf (pmap (head x) p)
+  }
+
+\instance ListEq {A : \Type} (dec : Eq A) : Eq (List A)
+  | decideEq => \lam xs ys => ListEq' dec xs ys
 
 -- 11. Докажите, что функции FromBoolToDec и FromDecToBool взаимно обратны
 
-\func bdb {A : \Type} (p : A -> Bool) : FromDecToBool (FromBoolToDec p) = p => {?}
+\func bdb' {A : \Type} (p : A -> Bool) (a : A) : decToBool (So-dec (p a)) = p a => cases (p a) \with {
+  | false => idp
+  | true => idp
+}
+
+\func bdb {A : \Type} (p : A -> Bool) : FromDecToBool (FromBoolToDec p) = p
+  => unfold (FromDecToBool, FromBoolToDec) $ funExt {A} {\lam _ => Bool} {\lam a => decToBool (So-dec (p a))} {p} (bdb' p)
 
 -- Мы не можем доказать, что FromBoolToDec (FromDecToBool P) = P,
 -- но мы можем доказать более слабое утверждение: эти предикаты логически эквивалентны
@@ -71,7 +191,13 @@
 
 \func dbd {A : \Type} (P : \Sigma (P : A -> \Type) (DecPred P))
   : \Pi (x : A) -> (FromBoolToDec (FromDecToBool P)).1 x <-> P.1 x
-  => {?}
+  => \lam a => (\lam p => cases (P.2 a, unfold (FromDecToBool, FromBoolToDec) p) \with {
+      | yes p', _ => p'
+      | no n, ()
+    }, \lam p => unfold (FromDecToBool, FromBoolToDec) $ cases (P.2 a) \with {
+      | yes p' => ()
+      | no nf => nf p
+    })
 
 
 -- Optional:
