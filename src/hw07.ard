@@ -1,6 +1,5 @@
 \import Data.Bool
 \import Data.List (List, headDef, length, tail)
-\import Data.Or
 \import Function.Meta
 \import Logic
 \import Meta
@@ -8,19 +7,14 @@
 \import Paths.Meta
 \import lect05 (funExt)
 \import lect07
-\open Nat(+,*)
+\open Nat(*)
 
 
 -- 1. Определите предикат принадлежности элемента списку
 
 \data In {A : \Type} (a : A) (xs : List A) \with
-  | a, x List.:: xs => in-ctr (Or (a = x) (In a xs))
-  | a, List.nil => Empty
-
--- another approach => no proofs inside
--- \func inPred {A : \Type} {eq : Eq A} (a : A) (xs : List A) : \Type
---   | a, x List.:: xs \as xs' => if (a Eq.== x) (In a xs') (In a xs)
---   | a, List.nil => Empty
+  | a, x List.:: xs => in-ctr-eq (a = x)
+  | a, x List.:: xs => in-ctr-rec (In a xs)
 
 -- Optional:
 -- 2. Докажите эквивалентность четырех различных определений LessOrEq: lessOrEq, lessOrEq', LessOrEq и LessOrEq'
@@ -83,21 +77,9 @@
   | List.nil => List.nil
   | x List.:: xs => if (p x) (x List.:: filter' p xs) (filter' p xs)
 
-\func if-helper {A : \Type} (b : Bool)
-                (valThen valElse : A)
-                (Container : A -> \Type)
-                (term-out : if b (Container valThen) (Container valElse))
-  : Container (if b valThen valElse) \elim b
-  | false => term-out
-  | true => term-out
-
 \func filter-lem' {A : \Type} (p : A -> Bool) (xs : List A) : LessOrEq (length (filter' p xs)) (length xs) \elim xs
   | List.nil => zero<=_
-  | x List.:: xs => if-helper (p x)
-                              (x Data.List.:: filter' p xs) (filter' p xs)
-                              (\lam n => LessOrEq (length n) (suc (length xs)))
-    $ cases (p x)
-  \with {
+  | x List.:: xs => cases (p x) \with {
     | false => <=-helper $ filter-lem' p xs
     | true => suc<=suc $ filter-lem' p xs
   }
@@ -105,21 +87,15 @@
 -- 8. Закончите определение функции \func BoolFuncLem (f : Bool -> Bool) (x : Bool) : f (f (f x)) = f x из лекции
 
 \func BoolFuncLem (f : Bool -> Bool) (x : Bool) : f (f (f x)) = f x
-  => cases (f x arg addPath, f true arg addPath, f false arg addPath) \with {
-    | false, p, false, p1, false, p2 => rewrite (p2, p2) idp
-    | false, p, false, p1, true, p2 => rewrite (p2, p1) idp
-    | false, p, true, p1, false, p2 => rewrite (p2, p2) idp
-    | false, p, true, p1, true, p2 => \case x \as y, p : f y = false \return f (f false) = false \with {
-      | false, p3 => \case inv p3 *> p2
-      | true, p3 => \case inv p3 *> p1
-    }
-    | true, p, false, p1, false, p2 => cases (x, p) \with {
-      | false, p => \case inv p *> p2
-      | true, p => \case inv p *> p1
-    }
-    | true, p, false, p1, true, p2 => rewrite (p1, p2) idp
-    | true, p, true, p1, false, p2 => rewrite (p1, p1) idp
-    | true, p, true, p1, true, p2 => rewrite (p1, p1) idp
+  => cases (x arg addPath, f true arg addPath, f false arg addPath) \with {
+    | false, p, false, p1, false, p2 => rewrite (p2, p2, p2) idp
+    | false, p, false, p1, true, p2 => rewrite (p2, p1, p2) idp
+    | false, p, true, p1, false, p2 => rewrite (p2, p2, p2) idp
+    | false, p, true, p1, true, p2 => rewrite (p2, p1, p1) idp
+    | true, p, false, p1, false, p2 => rewrite (p1, p2, p2) idp
+    | true, p, false, p1, true, p2 => rewrite (p1, p2, p1) idp
+    | true, p, true, p1, false, p2 => rewrite (p1, p1, p1) idp
+    | true, p, true, p1, true, p2 => rewrite (p1, p1, p1) idp
   }
 
 -- 9. Докажите, что предикат isEven разрешим
@@ -138,7 +114,7 @@
     | yes (k, p) => yes (suc k, pmap (\lam x => suc (suc x)) p)
     | no nf => no $ \lam (k, p) => cases (k arg addPath, nf) \with {
       | 0, p', _ => \case rewrite p' p
-      | suc k, p', nf => cases (rewrite p' p) \with {
+      | suc k, p', nf => \case rewrite p' p \with {
         | p => nf (k, isEvenPredHelper n k p)
       }
     }
@@ -152,8 +128,8 @@
   | List.nil, List.nil => yes idp
   | List.nil, y List.:: ys => no $ \lam p => \case p
   | x List.:: xs, List.nil => no $ \lam p => \case p
-  | x List.:: xs, y List.:: ys => cases (decideEq x y) \with {
-    | yes px => cases (ListEq' dec xs ys) \with {
+  | x List.:: xs, y List.:: ys => \case decideEq x y \with {
+    | yes px => \case ListEq' dec xs ys \with {
       | yes pxs => yes $ rewriteI px $ pmap (List.:: x) pxs
       | no nf => no $ \lam p => nf (pmap tail p)
     }
