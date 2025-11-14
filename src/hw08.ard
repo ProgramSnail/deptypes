@@ -1,7 +1,13 @@
 \import Data.Bool
 \import Data.List \hiding (headDef)
+\import Function.Meta
+\import Logic (Empty)
+\import Meta
+\import Paths.Meta
 \import hw07
+\import lect02 (<=>)
 \import lect08
+\import hw07 (Sublist)
 \import Order.LinearOrder
 \open LinearOrder
 
@@ -10,7 +16,70 @@
 --    * Все элементы filter p xs удовлетворяют предикату p
 --    * Любой подсписок xs с тем же свойством является подсписком filter p xs
 
+\func filter {A : \Type} (xs : List A) (p : A -> Bool) : List A \elim xs
+  | nil => nil
+  | a :: xs => \case p a \with {
+    | false => filter xs p
+    | true => a :: filter xs p
+  }
+
+-- same to hw07
+\func filter-sublist {A : \Type} (xs : List A) (p : A -> Bool) : Sublist (filter xs p) xs \elim xs
+  | nil => subl-nil
+  | x :: xs => cases (p x) \with {
+    | false => subl-tail (filter-sublist xs p)
+    | true => subl-match idp (filter-sublist xs p)
+  }
+
+\data AllPred {A : \Type} (xs : List A) (p : A -> Bool) \elim xs
+  | nil => all-pred-nil
+  | x :: xs => all-pred-cons (So $ p x) (AllPred xs p)
+
+\func filter-all-pred {A : \Type} (xs : List A) (p : A -> Bool) : AllPred (filter xs p) p \elim xs
+  | nil => all-pred-nil
+  | x :: xs => cases (p x arg addPath) \with {
+    | false, _ => filter-all-pred xs p
+    | true, eq => all-pred-cons (rewrite eq ()) (filter-all-pred xs p)
+}
+
+\func filter-rublist-filter-sublist {A : \Type} (xs ys : List A) (p : A -> Bool) (y-subl : Sublist ys xs) (y-ap : AllPred ys p) : Sublist ys (filter xs p) \elim xs, ys, y-subl {
+  | xs, nil, subl-nil => subl-nil
+  | x :: xs, y :: ys, subl-match eq y-subl => cases (p x arg addPath) \with {
+    | false, x-np => \case rewrite (eq, x-np) $ pred-head y-ap
+    | true, x-p => rewrite eq $ subl-match idp $ filter-rublist-filter-sublist xs ys p y-subl (pred-tail y-ap)
+  }
+  | x :: xs, ys, subl-tail y-subl => cases (p x arg addPath) \with {
+    | false, _ => filter-rublist-filter-sublist xs ys p y-subl y-ap
+    | true, _ => subl-tail $ filter-rublist-filter-sublist xs ys p y-subl y-ap
+  }
+} \where {
+  \func nil-subl {A : \Type} (xs : List A) : Sublist nil xs \elim xs
+    | nil => subl-nil
+    | x :: xs => subl-tail (nil-subl xs)
+
+  \func subl-next-tail {A : \Type} (x : A) (xs ys : List A) (p : A -> Bool) (y-subl : Sublist ys (x :: xs)) (y-ap : AllPred ys p) (x-np : p x = false) :  Sublist ys xs \elim ys, y-subl
+    | nil, subl-nil => subl-nil
+    | y :: ys, subl-match eq y-subl => \case rewrite (eq, x-np) $ pred-head y-ap
+    | ys, subl-tail y-subl => y-subl
+
+  \func pred-head {A : \Type} {x : A} {xs : List A} {p : A -> Bool} (ap : AllPred (x :: xs) p) : p x = true \elim ap
+    | all-pred-cons s _ => So.fromSo s
+
+  \func pred-tail {A : \Type} {x : A} {xs : List A} {p : A -> Bool} (ap : AllPred (x :: xs) p) : AllPred xs p \elim ap
+    | all-pred-cons _ ap => ap
+}
+
 -- 2. Докажите, что Perm l1 l2 тогда и только тогда, когда Insertion.sort l1 = Insertion.sort l2
+
+\func sort-eq-absurd {A : Dec} {y : A} {ys : List A} (p : nil {A} = Insertion.sort (y :: ys)) : Empty \elim ys
+  | nil => \case p
+  | y' :: ys => {?}
+
+\func perm-from-sort {A : Dec} (xs ys : List A) : (Insertion.sort xs = Insertion.sort ys) <=> Perm xs ys \elim xs, ys
+  | nil, nil => (\lam _ => perm-nil, \lam _ => idp)
+  | nil, y :: ys => (\lam sort => {?}, \lam perm => {?}) --
+  | x :: xs, nil => (\lam sort => {?}, \lam perm => {?})
+  | x :: xs, y :: ys => (\lam sort => {?}, \lam perm => {?})
 
 -- 3. Докажите, что спецификация "результат является перестановкой входа и отсортирован" является полной для функции sort
 
