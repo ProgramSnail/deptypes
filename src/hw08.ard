@@ -1,8 +1,10 @@
+\import Arith.Nat
 \import Data.Bool
-\import Data.List \hiding (headDef)
+\import Data.List
 \import Function.Meta
 \import Logic (Empty)
 \import Meta
+\import Paths
 \import Paths.Meta
 \import hw07
 \import lect02 (<=>)
@@ -10,6 +12,8 @@
 \import hw07 (Sublist)
 \import Order.LinearOrder
 \open LinearOrder
+
+\open Nat(+, *)
 
 -- 1. Реализуйте функцию filter и докажите ее корректность, то есть, что выполнены следующие условия:
 --    * filter p xs является подсписком xs
@@ -71,9 +75,18 @@
 
 -- 2. Докажите, что Perm l1 l2 тогда и только тогда, когда Insertion.sort l1 = Insertion.sort l2
 
-\func sort-eq-absurd {A : Dec} {y : A} {ys : List A} (p : nil {A} = Insertion.sort (y :: ys)) : Empty \elim ys
-  | nil => \case p
-  | y' :: ys => {?}
+\func sort-eq-nil-absurd {A : Dec} {y : A} {ys : List A} (p : nil {A} = Insertion.sort (y :: ys)) : Empty \elim ys, p
+  | a :: ys, p => {?}
+
+\func list-same-len {A : Dec} (xs ys : List A) (p : xs = ys) : length xs = length ys \elim xs, ys, p
+  | nil, nil, p => idp
+  | x :: xs, y :: ys, p => pmap suc $ list-same-len xs ys $ pmap tail p
+
+\func perm-same-len {A : Dec} {xs ys : List A} (p : Perm xs ys) : length xs = length ys \elim xs, ys, p
+  | nil, nil, perm-nil => idp
+  | x :: xs, y :: ys, perm-cons _ p => pmap suc $ perm-same-len p
+  | x :: (x' :: xs), y :: (y' :: ys), perm-swap _ _ eq => pmap suc $ pmap suc $ list-same-len xs ys eq
+  | xs, ys, perm-trans px py => rewrite (perm-same-len px) $ perm-same-len py
 
 \func perm-from-sort {A : Dec} (xs ys : List A) : (Insertion.sort xs = Insertion.sort ys) <=> Perm xs ys \elim xs, ys
   | nil, nil => (\lam _ => perm-nil, \lam _ => idp)
@@ -88,6 +101,28 @@
 
 -- 4. Определите факториал через хвостовую рекурсию
 --    Докажите, что он равен обычному определению факториала
+
+\func fac (x : Nat) : Nat \elim x
+  | 0 => 1
+  | suc n' \as n => n * fac n'
+
+\func fac-tailrec (n : Nat) : Nat => aux n 1 \where {
+  \func aux (n acc : Nat) : Nat \elim n
+    | 0 => acc
+    | suc n' \as n => aux n' $ acc * n
+}
+
+\func fac-eq-fac-tailrec (n : Nat) : fac n = fac-tailrec n =>
+  \have p : 1 * fac n = fac n => NatSemiring.ide-left \in rewriteI p $ aux n 1 \where {
+  \func aux (n x : Nat) : x * fac n = fac-tailrec.aux n x \elim n
+    | 0 => idp
+    | suc n' \as n => \have | eq-rec : (x * n) * fac n' = fac-tailrec.aux n' (x * n) => aux n' (x * n)
+                            | eq-left : (x * n) * fac n' = x * (suc n' * fac n') => NatSemiring.*-assoc
+                            | eq-right : fac-tailrec.aux n' (x * n) = fac-tailrec.aux n x => idp
+                      \in
+      rewriteI eq-left $ rewrite eq-right eq-rec
+}
+
 
 -- 5. Определите функцию, которая проверяет правильность скобочной последовательности
 --    Докажите ее корректность
