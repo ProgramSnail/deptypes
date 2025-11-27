@@ -1,45 +1,247 @@
 \import Data.Maybe
-\import lect07 (Decide)
+\import Function.Meta
+\import Meta
+\import Paths
+\import Paths.Meta
+\import hw07
+\import lect06 (fmap, fmap-comp)
+\import lect07 (Decide, no, yes)
 \import lect09
 
 
 -- 1. Докажите, что оператор >>= ассоциативен для Monad Term
 
-\func Term->>=-assoc {A B C : \Set} (t : Term A) (k : A -> Term B) (l : B -> Term C)
-  : t >>= k >>= l = {Term C} t >>= (\lam a => k a >>= l) => {?}
+-- does not work this way
+-- \func Term->>=-assoc-lem''' {B C : \Set} (l : B -> Term C) (b : Term B)
+--   : termMap (Monad.fmap just) b >>= liftM (maybe (var nothing) (\lam a => termMap just (l a))) = termMap (Monad.fmap just) (b >>= liftM l) \elim b
+--   | unit => idp
+--   | var v => idp
+--   | app b1 b2 => \have
+--     | p1 => Term->>=-assoc-lem''' l b1
+--     | p2 => Term->>=-assoc-lem''' l b2
+--                  \in unfold (>>=) $ rewrite p1 $ rewrite p2 idp
+--   | lam b => \have p => Term->>=-assoc-lem''' (liftM l) b \in
+--     pmap lam {?}
 
+\func termMapComp {A B C : \Set} (f : B -> C) (g : A -> B) (x : Term A) : termMap (\lam a => f (g a)) x = termMap f (termMap g x) \elim x
+  | unit => idp
+  | var v => idp
+  | app x1 x2 => \have
+                   | p1 => termMapComp f g x1
+                   | p2 => termMapComp f g x2
+                 \in rewrite p1 $ rewrite p2 idp
+  | lam x => \have
+               | p => termMapComp (fmap f) (fmap g) x
+               | p' : \Pi (x : Maybe A) -> fmap (\lam a => f (g a)) x = (\lam a => fmap f (fmap g a)) x => \lam x => rewrite (fmap-comp f g x) idp
+               | p'' : fmap (\lam a => f (g a)) = (\lam a => fmap f (fmap g a)) => ext p'
+             \in rewriteI p $ rewrite p'' idp
+
+\func Term->>=-assoc-lem {B C : \Set} (l : B -> Term C) (b : Term B)
+  : termMap just b >>= maybe (var nothing) (\lam a => termMap just (l a)) = termMap just (b >>= l) \elim b
+  | unit => idp
+  | var v => idp
+  | app b1 b2 => \have
+                   | p1 => Term->>=-assoc-lem l b1
+                   | p2 => Term->>=-assoc-lem l b2
+                 \in unfold (>>=) $ rewrite p1 $ rewrite p2 idp
+  | lam b => \have p => Term->>=-assoc-lem (liftM l) b \in
+             pmap lam {?}
+
+-- termMap (fmap just) b >>= liftM (maybe (var nothing) (\lam a => termMap just (l a))) = termMap (fmap just) (b >>= liftM l)
+-- p : termMap just b >>= maybe (var nothing) (\lam a => termMap just (liftM l a)) = termMap just (b >>= liftM l)
+
+-- \func Term->>=-assoc-lem'' {B C : \Set} (l : B -> Term C) (b : Term B) (f : \Pi {A A' : \Set} -> A -> A')
+--   (unit_p : termMap f (unit {B}) >>= maybe (var (nothing {Maybe C})) (\lam a => termMap f (l a)) = termMap f (unit >>= l))
+--   (var_p : \Pi (v : B) -> termMap f (var v) >>= maybe (var (nothing {Maybe C})) (\lam a => termMap f (l a)) = termMap f (var v >>= l))
+--   : termMap f b >>= maybe (var (nothing {Maybe C})) (\lam a => termMap f (l a)) = termMap f (b >>= l) \elim b
+--   | unit => unit_p
+--   | var v => var_p v
+--   | app b1 b2 => \have
+--                    | p1 => Term->>=-assoc-lem'' l b1 f unit_p var_p
+--                    | p2 => Term->>=-assoc-lem'' l b2 f unit_p var_p
+--                  \in unfold (>>=) $ rewrite p1 $ rewrite p2 idp
+--   | lam b => \have p => Term->>=-assoc-lem'' (liftM l) b (Monad.fmap f) \in
+--     pmap lam {?}
+
+-- \func Term->>=-assoc-lem'' {B C : \Set} (l : B -> Term C) (b : Term B) (f : \Pi {A A' : \Set} -> Term A -> Term A')
+--   (unit_p : f (unit {B}) >>= maybe (var (nothing {Maybe C})) (\lam a => f (l a)) = f (unit >>= l))
+--   (var_p : \Pi (v : B) -> f (var v) >>= maybe (var (nothing {Maybe C})) (\lam a => f (l a)) = f (var v >>= l))
+--   : f b >>= maybe (var (nothing {Maybe C})) (\lam a => f (l a)) = f (b >>= l) \elim b
+--   | unit => unit_p
+--   | var v => var_p v
+--   | app b1 b2 => \have
+--     | p1 => Term->>=-assoc-lem'' l b1
+--     | p2 => Term->>=-assoc-lem'' l b2
+--                  \in unfold (>>=) $ rewrite p1 $ rewrite p2 idp
+--   | lam b => \have p => Term->>=-assoc-lem'' (liftM l) b \in
+--     pmap lam {?}
+
+-- termMap (fmap just) b) >>= maybe (var nothing) (\lam a => termMap just (l a)
+-- = termMap (fmap just) (b >>= liftM l)
+
+\func Term->>=-assoc {A B C : \Set} (t : Term A) (k : A -> Term B) (l : B -> Term C)
+  : t >>= k >>= l = {Term C} t >>= (\lam a => k a >>= l) \elim t
+  | unit => idp
+  | var v => idp
+  | app t1 t2 => \have
+                   | p1 => Term->>=-assoc t1 k l
+                   | p2 => Term->>=-assoc t2 k l
+                 \in unfold (>>=) $ rewrite p1 $ rewrite p2 idp
+  | lam t => \have p => Term->>=-assoc t (liftM k) (liftM l) \in
+             unfold (>>=) $ rewrite p $
+             pmap lam $ pmap (\lam x => t >>= x) $
+             ext (\case \elim __ \with {
+               | nothing => idp
+               | just a => unfold liftM $ Term->>=-assoc-lem l (k a)
+             })
 
 -- 2. Определите отношение многошаговой редукции на Term
 
-\func Red {V : \Set} (t s : Term V) : \Type => {?}
+\func Red {V : \Set} (t s : Term V) : \Type => ReflTransClosure Red1 t s
 
 
 -- 3. Стратегия редукции -- это функция, которая каждому терму сопоставляет либо некоторый терм,
 --    к которому он редуцируется за 1 шаг, либо доказательство, что таких термов нет
 --    Определите любую стратегию редукции
 
-\func strategy {V : \Set} (t : Term V) : Decide (\Sigma (s : Term V) (Red1 t s)) => {?}
+\func strategy {V : \Set} (t : Term V) : Decide (\Sigma (s : Term V) (Red1 t s)) \elim t
+  | unit => Decide.no $ \lam x => \case x.2
+  | var v => Decide.no $ \lam x => \case x.2
+  | app t1 t2 \as t => cases (strategy t1) \with {
+    | yes a => Decide.yes (app a.1 t2, red-left a.2 idp)
+    | no n1 => cases (strategy t2) \with {
+      | yes a => Decide.yes (app t1 a.1, red-right idp a.2)
+      | no n2 => cases (t1 arg addPath) \with {
+        | unit, p => Decide.no $ \lam x => cases (x.1, x.2) \with {
+          | _, beta f () _
+          | app _ _, red-left () _
+          | app _ x, red-right _ r => n2 (x, r)
+        }
+        | var v, p => Decide.no $ \lam x => cases (x.1, x.2) \with {
+          | _, beta f () _
+          | app _ _, red-left () _
+          | app _ x, red-right _ r => n2 (x, r)
+        }
+        | app x1 x2, p => Decide.no $ \lam x => cases (x.1, x.2) \with {
+          | _, beta f () _
+          | app x _, red-left r _ => n1 (x, rewrite p r)
+          | app _ x, red-right _ r => n2 (x, r)
+        }
+        | lam f, p => Decide.yes (f >>= maybe t2 var, beta f idp idp)
+     }
+   }
+ }
+  | lam t => \case strategy t \with {
+    | yes a => Decide.yes $ (lam a.1, red-lam a.2)
+    | no n => Decide.no $ \lam x => cases (x.1, x.2) \with {
+      | lam x1, red-lam x2 => n (x1, x2)
+    }
+  }
 
 
 -- 4. Докажите, что подтермы достижимого терма достижимы
 
-\func appAccLeft {V : \Set} {t s : Term V} (a : Acc Red1 (app t s)) : Acc Red1 t
-  => {?}
+\func appAccLeft {V : \Set} {t s : Term V} (a : Acc Red1 (app t s)) : Acc Red1 t \elim a
+  | acc f => acc (\lam a' r => appAccLeft $ f (app a' s) (red-left r idp))
+--  | acc f \as a => acc (\lam a' r => f (app a' s) (red-left r idp))
 
-\func appAccRight {V : \Set} {t s : Term V} (a : Acc Red1 (app t s)) : Acc Red1 s
-  => {?}
+\func appAccRight {V : \Set} {t s : Term V} (a : Acc Red1 (app t s)) : Acc Red1 s \elim a
+  | acc f => acc (\lam a' r => appAccRight $ f (app t a') (red-right idp r))
 
-\func subLamAcc {V : \Set} {t : Term (Maybe V)} (a : Acc Red1 (lam t)) : Acc Red1 t
-  => {?}
-
+\func subLamAcc {V : \Set} {t : Term (Maybe V)} (a : Acc Red1 (lam t)) : Acc Red1 t \elim a
+  | acc f => acc (\lam a' r => subLamAcc $ f (lam a') (red-lam r))
 
 -- 5. Докажите следующую обобщенную лемму о подстановке и выведите из нее обычную версию:
 --    если Г, x : A |- b : B и Г |- a : A, то Г |- b[a/x] : B
 
+-- \func ctxExtendSaveType {U : \Set} (f : U -> Maybe U) (ctx : U -> Type)
+--                         (x : Term U) (T A : Type) (h : hasType ctx x T)
+--                         (p : \Pi (v : U) -> maybe A ctx (f v) = T)
+--   : hasType (maybe A ctx) (termMap f x) T \elim x, T, h
+--   | unit, Unit, unit-type => unit-type
+--   | var v, T, var-type h => var-type $ p v
+--   | app x1 x2, B, app-type T h1 h2 => app-type T (ctxExtendSaveType f ctx x1 (Type.Arr T B) A h1 p) (ctxExtendSaveType f ctx x2 T A h2 p)
+--   | lam x, Arr B T, lam-type h => lam-type (ctxExtendSaveType (lect06.fmap f) (maybe A ctx) x T B {?} (\lam v => cases (v arg addPath) \with {
+--     | nothing, p1 => {?}
+--     | just a, p1 => {?}
+--   } ))
+
+-- \func termMapComb {U : \Set} (t : Term (Maybe U)) : termMap just (termMap just t) = termMap (\lam m => m >>= \lam a => return (just a)) t => {?}
+--
+
+\func hastTypeCtxSwap {U : \Set}
+                      (ctx : U -> Type)
+                      (x : Term (Maybe U)) (T A B : Type)
+                      (h : hasType (maybe A (maybe B ctx)) (termMap just x) T)
+  : hasType (maybe B (maybe A ctx)) (termMap (Monad.fmap just) x) T \elim x, T, h
+  | unit, Unit, unit-type => unit-type
+  | var v, T, var-type p => var-type $ rewriteI p $ cases (v arg addPath) \with {
+    | nothing, _ => idp
+    | just a, _ => idp
+  }
+  | app x1 x2, T2, app-type T1 h1 h2 => app-type T1 (hastTypeCtxSwap ctx x1 (Type.Arr T1 T2) A B h1) (hastTypeCtxSwap ctx x2 T1 A B h2)
+  | lam x, Arr T1 T2, lam-type h => lam-type $ {?}
+                                                   -- \have p => hastTypeCtxSwap (maybe B ctx) {?} T2 T1 A h \in {?}
+-- Have: hasType (maybe T1 (maybe A (maybe B ctx))) (termMap (lect06.fmap just) x) T2
+
+--  Expected type: hasType (maybe B (maybe A ctx)) (lam (termMap (lect06.fmap (lect06.fmap just)) x)) (Arr T1 T2)
+
+\func ctxExtendSaveType {U : \Set} (ctx : U -> Type)
+                        (x : Term U) (T A : Type) (h : hasType ctx x T)
+  : hasType (maybe A ctx) (termMap just x) T \elim x, T, h
+  | unit, Unit, unit-type => unit-type
+  | var v, T, var-type h => var-type h
+  | app x1 x2, B, app-type T h1 h2 => app-type T (ctxExtendSaveType ctx x1 (Type.Arr T B) A h1) (ctxExtendSaveType ctx x2 T A h2)
+  | lam x, Arr B T, lam-type h => \have
+    | p => ctxExtendSaveType (maybe B ctx) x T A h
+    \in lam-type $ hastTypeCtxSwap ctx x T A B p
+
+
+\func ctxExtendSaveTypeHelper {U : \Set} (b : Term U) : termMap just b = b >>= (\lam x => Monad.fmap just $ var x) \elim b
+  | unit => idp
+  | var v => idp
+  | app b1 b2 => rewrite (ctxExtendSaveTypeHelper b1) $ rewrite (ctxExtendSaveTypeHelper b2) idp
+  | lam b => \have p => ctxExtendSaveTypeHelper b \in {?}
+
+-- lam (termMap (lect06.fmap just) b) = lam (b TermMonad.>>= liftM (\lam x => var (just x)))
+
+\func ctxExtendSaveType' {U : \Set} (ctx : U -> Type)
+                         (b : Term U) (B A : Type) (h : hasType ctx b B)
+                         (h' : \Pi (u : U) -> hasType ctx (var u) (ctx u))
+  : hasType (maybe A ctx) (termMap just b) B => rewrite ctxExtendSaveTypeHelper $ substLem ctx b B h (maybe A ctx) (\lam x => Monad.fmap just $ var x) {?}
+
+
+
+-- Expected type: hasType (maybe B (maybe A ctx)) (termMap (lect06.fmap just) x) T
+
+
+    -- lam-type (ctxExtendSaveType {?} (\lam m => m >>= (\lam (a : U) => return (just a))) y)) T B {?})
+
+--   Expected type: hasType (maybe B (maybe A ctx)) (termMap (lect06.fmap just) x) T'
+--
+--       hasType {Maybe (Maybe U)} (maybe {Maybe U} {Type} B (maybe {U} {Type} A ctx)) (termMap {Maybe U} {Maybe (Maybe U)}
+--           (\lam (m : lect06.Functor.F U) => m MaybeMonad.>>= (\lam (a : U) => return {Maybe U} (just {U} a))) y) T
+--       Actual type: hasType {Maybe (Maybe U)} (maybe {Maybe U} {Type} B {?}) (termMap {Maybe U} {Maybe (Maybe U)} (just {Maybe U}) y) T
+
+
 \func substLem {U V : \Set} (ctx : U -> Type) (b : Term U) (B : Type) (h : hasType ctx b B)
                (ctx' : V -> Type) (a : U -> Term V) (h' : \Pi (u : U) -> hasType ctx' (a u) (ctx u))
-  : hasType ctx' (b >>= a) B => {?}
+  : hasType ctx' (b >>= a) B \elim b, B, h
+  | unit, Unit, unit-type => unit-type
+  | var v, B, var-type p => rewriteI p $ h' v  -- var-type {?}
+  | app b1 b2, B, app-type T h1 h2 => app-type T (substLem ctx b1 (Type.Arr T B) h1 ctx' a h') (substLem ctx b2 T h2 ctx' a h')
 
+  | lam b, Arr B T, lam-type h => lam-type (substLem (maybe B ctx) b T h (maybe B ctx') (liftM a) (\lam x => cases (x arg addPath) \with {
+    | nothing, p => var-type idp
+    | just x, p => unfold liftM $ \have p => h' x \in ctxExtendSaveType ctx' (a x) (ctx x) B p
+  }))
+
+
+-- | lam b, Arr B T, lam-type h => lam-type $ {?}
+--     \have p : hasType ctx' (b >>= {?}) T => substLem (maybe B ctx) b T h ctx' (maybe unit a) (\lam x => cases (x arg addPath) \with {
+--     | nothing, p => {?}
+--     | just u, p => h' u
+--   }) \in {?} -- TODO ??
 \func substLem1 => {?}
 
 
