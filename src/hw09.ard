@@ -23,6 +23,13 @@
 --   | lam b => \have p => Term->>=-assoc-lem''' (liftM l) b \in
 --     pmap lam {?}
 
+
+\func fmapCompHelper {A B C : \Set} (f : B -> C) (g : A -> B) (x : Maybe A)
+  : fmap (\lam a => f (g a)) x = (\lam a => fmap f (fmap g a)) x => rewrite (fmap-comp f g x) idp
+
+\func fmapCompHelper' {A B C : \Set} (f : B -> C) (g : A -> B)
+  : fmap (\lam a => f (g a)) = (\lam a => fmap f (fmap g a)) => ext $ fmapCompHelper f g
+
 \func termMapComp {A B C : \Set} (f : B -> C) (g : A -> B) (x : Term A) : termMap (\lam a => f (g a)) x = termMap f (termMap g x) \elim x
   | unit => idp
   | var v => idp
@@ -32,20 +39,86 @@
                  \in rewrite p1 $ rewrite p2 idp
   | lam x => \have
                | p => termMapComp (fmap f) (fmap g) x
-               | p' : \Pi (x : Maybe A) -> fmap (\lam a => f (g a)) x = (\lam a => fmap f (fmap g a)) x => \lam x => rewrite (fmap-comp f g x) idp
-               | p'' : fmap (\lam a => f (g a)) = (\lam a => fmap f (fmap g a)) => ext p'
-             \in rewriteI p $ rewrite p'' idp
+             \in rewriteI p $ rewrite fmapCompHelper' idp
+
+\func termMapFmap {A : \Set} (x : Term A)
+  : termMap just (termMap just x) = termMap (\lam a => fmap just (just a)) x \elim x
+  | unit => idp
+  | var v => idp
+  | app x1 x2 => \have
+                   | p1 => termMapFmap x1
+                   | p2 => termMapFmap x2
+                 \in rewrite p1 $ rewrite p2 idp
+  | lam x => \have
+               | p => termMapFmap x
+             \in rewriteI (termMapComp (fmap just) (fmap just) x) $
+                 rewriteI (fmapCompHelper' just just) idp
+
+\func Term->>=-assoc-lem'' {B C : \Set} (l : B -> Term C) (v : Maybe B)
+  : liftM (liftM l) (fmap just v) = termMap (fmap just) (liftM l v) \elim v
+  | nothing => idp
+  | just a => unfold liftM $ rewriteI (termMapComp (fmap just) just (l a)) $ termMapFmap (l a)
+
+\func maybeN (A : \Set) (n : Nat) : \Set \elim n
+  | 0 => A
+  | suc n => maybeN (Maybe A) n
+
+-- why can't just rewrite ?
+\func maybeNEq (A : \Set) (n : Nat) (x : Maybe (maybeN A n))
+  : maybeN A (suc n) \elim n
+  | 0 => x
+  | suc n => maybeNEq (Maybe A) n x
+\func maybeNEqInv (A : \Set) (n : Nat) (x : maybeN A (suc n))
+  : Maybe (maybeN A n) \elim n
+  | 0 => x
+  | suc n => maybeNEqInv (Maybe A) n x
+
+\func liftMN (A B : \Set) (n : Nat) : (A -> Term B) -> maybeN A n -> Term (maybeN B n) \elim n
+  | 0 => \lam f => f
+  | suc n => \lam f => \lam x => termMap (maybeNEq B n) $ liftM (liftMN A B n f) (maybeNEqInv A n x)
+
+\func fmapJustN (A : \Set) (n : Nat) : maybeN A n -> maybeN A (suc n) \elim n
+  | 0 => just
+  | suc n => \lam x => maybeNEq A (suc n) $ fmap (fmapJustN A n) $ maybeNEqInv A n x
+
+\func Term->>=-assoc-lem-abs (B C : \Set) (n : Nat) (l : B -> Term C) (b : Term (maybeN B n))
+  : termMap (fmapJustN B n) b >>= (\lam x => termMap (maybeNEq C n) $ liftM (liftMN B C n l) (maybeNEqInv B n x))
+    = termMap (fmapJustN C n) (b >>= liftMN B C n l) \elim n, b
+  | _, unit => idp
+  | 0, var v => {?}
+  | suc n, var v => {?}
+  | n, app b1 b2 => \have
+    | p1 => Term->>=-assoc-lem-abs B C n l b1
+    | p2 => Term->>=-assoc-lem-abs B C n l b2
+                 \in unfold (>>=) $ rewrite p1 $ rewrite p2 idp
+  | n, lam b => {?}
+-- Expected type: lam (termMap (fmap (fmapJustN B n)) b) >>= (\lam x => termMap (maybeNEq C n) (liftM (liftMN B C n l) (maybeNEqInv B n x))) = lam (termMap (fmap (fmapJustN C n)) (b >>= liftM (liftMN B C n l)))
+
+
+\func Term->>=-assoc-lem-lift {B C : \Set} (l : B -> Term C) (b : Term (Maybe B))
+  : termMap (fmap just) b >>= liftM (liftM l) = termMap (fmap just) (b >>= liftM l) \elim b
+  | unit => idp
+  | var v => Term->>=-assoc-lem'' l v
+  | app b1 b2 => \have
+    | p1 => Term->>=-assoc-lem-lift l b1
+    | p2 => Term->>=-assoc-lem-lift l b2
+                 \in unfold (>>=) $ rewrite p1 $ rewrite p2 idp
+  | lam b => \have p => Term->>=-assoc-lem-lift (liftM l) b \in
+    pmap lam $ {?}
 
 \func Term->>=-assoc-lem {B C : \Set} (l : B -> Term C) (b : Term B)
-  : termMap just b >>= maybe (var nothing) (\lam a => termMap just (l a)) = termMap just (b >>= l) \elim b
+  : termMap just b >>= liftM l = termMap just (b >>= l) \elim b
   | unit => idp
   | var v => idp
   | app b1 b2 => \have
-                   | p1 => Term->>=-assoc-lem l b1
-                   | p2 => Term->>=-assoc-lem l b2
+    | p1 => Term->>=-assoc-lem l b1
+    | p2 => Term->>=-assoc-lem l b2
                  \in unfold (>>=) $ rewrite p1 $ rewrite p2 idp
   | lam b => \have p => Term->>=-assoc-lem (liftM l) b \in
-             pmap lam {?}
+    pmap lam $ {?}
+
+-- Expected type: termMap (fmap just) b >>= liftM (liftM l) = termMap (fmap just) (b >>= liftM l)
+
 
 -- termMap (fmap just) b >>= liftM (maybe (var nothing) (\lam a => termMap just (l a))) = termMap (fmap just) (b >>= liftM l)
 -- p : termMap just b >>= maybe (var nothing) (\lam a => termMap just (liftM l a)) = termMap just (b >>= liftM l)
@@ -79,6 +152,9 @@
 -- termMap (fmap just) b) >>= maybe (var nothing) (\lam a => termMap just (l a)
 -- = termMap (fmap just) (b >>= liftM l)
 
+\func Term->>=-assoc-lem' {A B C : \Set} (t : Maybe A) (k : A -> Term B) (l : B -> Term C)
+  : liftM k t >>= liftM l = liftM (\lam a => k a TermMonad.>>= l) t => {?}
+
 \func Term->>=-assoc {A B C : \Set} (t : Term A) (k : A -> Term B) (l : B -> Term C)
   : t >>= k >>= l = {Term C} t >>= (\lam a => k a >>= l) \elim t
   | unit => idp
@@ -92,7 +168,7 @@
              pmap lam $ pmap (\lam x => t >>= x) $
              ext (\case \elim __ \with {
                | nothing => idp
-               | just a => unfold liftM $ Term->>=-assoc-lem l (k a)
+               | just a => {?} -- unfold liftM $ Term->>=-assoc-lem l (k a)
              })
 
 -- 2. Определите отношение многошаговой редукции на Term
