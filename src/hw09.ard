@@ -81,6 +81,12 @@
   | 0 => just
   | suc n => \lam x => maybeNEq A (suc n) $ fmap (fmapJustN A n) $ maybeNEqInv A n x
 
+\func Term->>=-assoc-lem''-abs {B C : \Set} (n : Nat) (l : B -> Term C) (v : maybeN B n)
+  : liftM (liftMN B C n l) (maybeNEqInv B n $ fmapJustN B n v)
+  = termMap (\lam x => maybeNEqInv C n $ fmapJustN C n x) (liftMN B C n l v) \elim n, v
+  | 0, v => idp
+  | suc n, v => {?}
+
 \func Term->>=-assoc-lem-abs (B C : \Set) (n : Nat) (l : B -> Term C) (b : Term (maybeN B n))
   : termMap (fmapJustN B n) b >>= (\lam x => termMap (maybeNEq C n) $ liftM (liftMN B C n l) (maybeNEqInv B n x))
     = termMap (fmapJustN C n) (b >>= liftMN B C n l) \elim n, b
