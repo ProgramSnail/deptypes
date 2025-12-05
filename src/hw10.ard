@@ -1,9 +1,17 @@
+\import Arith.Nat (pred)
 \import Data.Bool
 \import Data.List
 \import Data.Or
 \import Function \hiding (isInj)
+\import Function.Meta
 \import Logic
-\import lect07 (Decide)
+\import Logic.Meta
+\import Meta
+\import Paths (*>, pmap, transport)
+\import Paths.Meta
+\import Set.Hedberg
+\import lect04 (Vec, cons)
+\import lect07 (Decide, no, yes)
 \import lect10
 
 
@@ -11,23 +19,24 @@
 --    Докажите, что если f и g инъективны, то g o f также инъективна
 --    Докажите, что если g o f инъективна, то f также инъективна
 
-\func o-inj {A B C : \Type} (f : A -> B) (g : B -> C) (p : isInj f) (q : isInj g) : isInj (g o f) => {?}
+\func o-inj {A B C : \Type} (f : A -> B) (g : B -> C) (p : isInj f) (q : isInj g) : isInj (g o f) => \lam eq => p (q eq)
 
-\func o-inj' {A B C : \Type} (f : A -> B) (g : B -> C) (p : isInj (g o f)) : isInj f => {?}
+\func o-inj' {A B C : \Type} (f : A -> B) (g : B -> C) (p : isInj (g o f)) : isInj f => \lam eq => p (pmap g eq)
 
 
 -- 2. Определите предикат "делится на 3 или на 5" так, чтобы он возвращал утверждения
 --    Докажите, что MultipleOf3Or5 вкладывается в Nat
 
-\func isMultipleOf3Or5 (n : Nat) : \Type => {?}
+-- ??
+\func isMultipleOf3Or5 (n : Nat) : \Type => mod3 n /= 0 -> mod3 n = 0
 
-\func isMultipleOf3Or5-isProp (n : Nat) : isProp (isMultipleOf3Or5 n) => {?}
+\func isMultipleOf3Or5-isProp (n : Nat) : isProp (isMultipleOf3Or5 n) => Impl-isProp prop-isProp
 
 \func MultipleOf3Or5 => \Sigma (n : Nat) (isMultipleOf3Or5 n)
 
 \func Mul-inc (m : MultipleOf3Or5) => m.1
 
-\func Mul-inc-isInj : isInj Mul-inc => {?}
+\func Mul-inc-isInj : isInj Mul-inc => unfold isInj \lam {x} {y} eq => {?}
 
 
 -- 3. Мы будем говорить, что тип A тривиален, если существует такой элемент в A, что любой другой элемент в A равен ему
@@ -37,12 +46,17 @@
 
 \func \infix 1 <-> (A B : \Type) => \Sigma (A -> B) (B -> A)
 
-\func isTriv-lem (A : \Type) : isTriv A <-> (\Sigma (isProp A) A) => {?}
+\func isTriv-lem (A : \Type) : isTriv A <-> (\Sigma (isProp A) A) => (\lam t => (\lam x y => rewriteI (t.2 x, t.2 y) idp, t.1),
+                                                                      \lam p => (p.2, \lam x => p.1 p.2 x))
 
 
 -- 4. Докажите, что Or не является утверждением в общем случае
 
-\func Or-isProp (p : \Pi {A B : \Type} (pA : isProp A) (pB : isProp B) -> isProp (Or A B)) : Empty => {?}
+\func Or-isProp (p : \Pi {A B : \Type} (pA : isProp A) (pB : isProp B) -> isProp (Or A B)) : Empty =>
+  \have
+    | q => p Unit-isProp Unit-isProp
+    | q' => q (inl ()) (inr ())
+  \in contradiction
 
 
 -- 5. Докажите, что LessOrEq является предикатом
@@ -51,8 +65,14 @@
   | 0, m => z<=n
   | suc n, suc m => s<=s (LessOrEq n m)
 
-\func LessOrEq-isProp {n m : Nat} : isProp (LessOrEq n m) => {?}
-
+\func LessOrEq-isProp {n m : Nat} : isProp (LessOrEq n m) \elim n, m
+  | 0, m => \lam x y => cases (x arg addPath, y arg addPath) \with {
+    | z<=n, _, z<=n, _ => idp
+  }
+  | suc n, 0 => \lam x => \case x
+  | suc n, suc m => \lam x y => cases (x arg addPath, y arg addPath) \with {
+    | s<=s x', p, s<=s y', p1 => pmap s<=s $ LessOrEq-isProp {n} {m} x' y'
+  }
 
 -- 6. Докажте, что ReflClosure LessOrEq не является предикатом, а ReflClosure (\lam x y => So (x < y)) является
 
@@ -65,34 +85,118 @@
   | refl (x = y)
   | inc (R x y)
 
-\func ReflClosure_<-isProp (n m : Nat) : isProp (ReflClosure (\lam x y => So (x < y)) n m) => {?}
+\func <-and-=-contr (n m : Nat) (p : So (n < m)) (q : n = m) : Empty \elim n, m, p, q
+  | 0, 0, (), q
+  | suc n, suc m, p, q => <-and-=-contr n m p (pmap pred q)
 
-\func ReflClosure_<=-isNotProp (p : \Pi (n m : Nat) -> isProp (ReflClosure LessOrEq n m)) : Empty => {?}
+\func ReflClosure_<-isProp (n m : Nat) : isProp (ReflClosure (\lam x y => So (x < y)) n m) => \lam x y => cases (x arg addPath, y arg addPath) \with {
+  | refl x', _, refl y', _ => pmap refl $ prop-isProp x' y'
+  | inc x', _, inc y', _ => pmap inc $ prop-isProp x' y'
+  | refl x', _, inc y', _ => \case <-and-=-contr _ _ y' x'
+  | inc x', _, refl y', _ => \case <-and-=-contr _ _ x' y'
+}
+
+\func ReflClosure_<=-isNotProp (p : \Pi (n m : Nat) -> isProp (ReflClosure LessOrEq n m)) : Empty =>
+  \have
+    p' => p 0 0 (refl idp) (inc z<=n)
+  \in contradiction
 
 
 -- 7. Докажите, что если тип A вкладывается в тип B и B является утверждением, то и A является утверждением
 
-\func sub-isProp {A B : \Type} (f : A -> B) (p : isInj f) (q : isProp B) : isProp A => {?}
+\func sub-isProp {A B : \Type} (f : A -> B) (p : isInj f) (q : isProp B) : isProp A => \lam x y => p $ q (f x) (f y)
 
 
 -- 8. Докажите, что тип с разрешимым равенством является множеством
 
 \func Dec-isSet {A : \Type} (dec : \Pi (x y : A) -> Decide (x = y)) : isSet A => {?}
+--   \lam x y => \case dec x y \with {
+--   | yes a => {?}
+--   | no n => \lam _ _ => contradiction
+-- }
 
 
 -- 9. Если A и B являются множествами, то A `Or` B тоже является множеством
 
-\func or-isSet {A B : \Type} (p : isSet A) (q : isSet B) : isSet (Or A B) => {?}
+\data Or' {A B : \Type} (a b : Or A B) \elim a, b
+  | inl a, inl b => ll-or (a = b)
+  | inr a, inr b => rr-or (a = b)
 
+\func Or'-isProp {A B : \Type} (p : isSet A) (q : isSet B) (x y : Or A B) : isProp (Or' x y) \elim x, y
+  | inl a, inl b => \lam x y => cases (x arg addPath, y arg addPath) \with {
+    | ll-or px, _, ll-or py, _ => pmap ll-or $ p a b px py
+  }
+  | inr a, inr b => \lam x y => cases (x arg addPath, y arg addPath) \with {
+    | rr-or px, _, rr-or py, _ => pmap rr-or $ q a b px py
+  }
+  | inl a, inr b => \lam x => \case x
+  | inr a, inl b => \lam x => \case x
+
+\func or-isSet {A B : \Type} (p : isSet A) (q : isSet B) : isSet (Or A B) =>
+  setLem (\lam x y => Or' x y) (Or'-isProp p q) (\lam a => cases a \with {
+    | inl _ => ll-or idp
+    | inr _ => rr-or idp
+  } ) (\lam {x} {y} eq => cases (x, y, eq) \with {
+    | inl _, inl _, ll-or p => pmap inl p
+    | inr _, inr _, rr-or p => pmap inr p
+  })
 
 -- 10. Если B x является множеством, то \Pi (x : A) -> B x тоже является множеством
 
-\func pi-isSet {A : \Type} (B : A -> \Type) (p : \Pi (x : A) -> isSet (B x)) : isSet (\Pi (x : A) -> B x) => {?}
+\func pi-isSet {A : \Type} (B : A -> \Type) (p : \Pi (x : A) -> isSet (B x)) : isSet (\Pi (x : A) -> B x) =>
+  setLem (\lam x y => \Pi (x y : A) (p : x = y) -> B x = B y) (\lam x y => {?}) {?} {?}
 
 
 -- 11. Докажите, что если A является множеством, то List A также им является
 
+\func VecEq-isProp {A : \Type} (n : Nat) (pA : isSet A) (xs ys : Vec A n) (a : VecEq n xs ys) (b : VecEq n xs ys) : a = b \elim n, xs, ys, a, b
+  | 0, Vec.nil, Vec.nil, vec-eq-nil, vec-eq-nil => idp
+  | suc n', Vec.cons x xs, Vec.cons y ys, vec-eq-cons (a_eq_x, a_eq_xs), vec-eq-cons (b_eq_x, b_eq_xs) =>
+    pmap vec-eq-cons $ Sigma-isProp (pA x y) (Vec-isSet n' pA xs ys) (a_eq_x, a_eq_xs) (b_eq_x, b_eq_xs)
+
+-- \func VecEq-isProp {A : \Type} (n : Nat) (pA : isSet A) (xs ys : Vec A n) : isProp (VecEq n xs ys) => \lam a b => cases (n, xs, ys, a, b) \with {
+--   | 0, Vec.nil, Vec.nil, vec-eq-nil, vec-eq-nil => idp
+--   | suc n', Vec.cons x xs, Vec.cons y ys, vec-eq-cons (a_eq_x, a_eq_xs), vec-eq-cons (b_eq_x, b_eq_xs) =>
+--     pmap vec-eq-cons $ Sigma-isProp (pA x y) (Vec-isSet n' pA xs ys) (a_eq_x, a_eq_xs) (b_eq_x, b_eq_xs)
+-- }
+
+\data VecEq {A : \Type} (n : Nat) (xs ys : Vec A n) \elim n, xs, ys
+  | 0, Vec.nil, Vec.nil => vec-eq-nil
+  | suc n, Vec.cons x xs, Vec.cons y ys => vec-eq-cons (\Sigma (x = y) (xs = ys))
+
+\func Vec-isSet {A : \Type} (n : Nat) (pA : isSet A) : isSet (Vec A n) =>
+  setLem (\lam xs ys => VecEq n xs ys) (VecEq-isProp n pA __ __) (\lam xs => cases (n, xs) \with {
+    | 0, Vec.nil => vec-eq-nil
+    | suc _, cons _ _ => vec-eq-cons (idp, idp)
+  }) (\lam {xs} {ys} eq => cases (n, xs, ys, eq) \with {
+    | 0, Vec.nil, Vec.nil, vec-eq-nil => idp
+    | suc n, cons x xs, cons y ys, vec-eq-cons eq => rewrite (eq.1, eq.2) idp
+  })
+
+\func listToVec {A : \Type} (xs : List A) : Vec A (length xs) \elim xs
+  | nil => Vec.nil
+  | x :: xs => Vec.cons x $ listToVec xs
+
+\func listToVec' {A : \Type} (n : Nat) (xs : List A) (p : n = length xs) : Vec A n \elim n, xs
+  | 0, nil => rewrite p $ Vec.nil
+  | suc n, x :: xs => Vec.cons x $ listToVec' n xs (pmap pred p)
+
+\func listFromVec {A : \Type} {n : Nat} (xs : Vec A n) : List A \elim n, xs
+  | 0, Vec.nil => nil
+  | suc n, Vec.cons x xs => x :: listFromVec xs
+
+-- \func List-isSet' {A : \Type} (pA : isSet A) (xs : List A) (ys : List A) (p : length xs = length ys) : isProp (xs = ys) =>
+--   \let
+--     | n => length xs
+-- --     | xs_v => listToVec' n xs idp
+-- --     | ys_v => listToVec' n ys p
+--     | xs_v => listToVec xs
+--     | ys_v => rewriteI p $ listToVec ys
+--     | p => retract-isProp {(xs, length xs) = (ys, length ys)} {xs_v = ys_v} (Vec-isSet (length xs) pA xs_v ys_v) {?} {?} {?}
+--   \in {?}
+
 \func List-isSet {A : \Type} (pA : isSet A) : isSet (List A) => {?}
+--  setLem (\lam xs ys => {?}) {?} {?} {?}
 
 
 -- Optional:
