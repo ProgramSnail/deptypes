@@ -36,7 +36,15 @@
 
 \func Mul-inc (m : MultipleOf3Or5) => m.1
 
-\func Mul-inc-isInj : isInj Mul-inc => unfold isInj \lam {x} {y} eq => {?}
+\func Mul-inc-isInj : isInj Mul-inc => unfold isInj \lam {x} {y} eq =>
+    \let
+     | p => unfold Mul-inc eq
+    \in cases (x.1 arg addPath, x.2 arg addPath, y.1 arg addPath, y.2 arg addPath, eq) \with {
+      | 0, p1, x1, idp, 0, p2, x2, idp, x3 => \let isMultipleOf3Or5-isProp 0
+      | 0, p1, x1, idp, suc x2, p2, x3, idp, ()
+      | suc x1, p1, x2, idp, 0, p2, x3, idp, ()
+      | suc x1, p1, x2, idp, suc x3, p2, x4, idp, x5 => {?}
+    }
 
 
 -- 3. Мы будем говорить, что тип A тривиален, если существует такой элемент в A, что любой другой элемент в A равен ему
@@ -144,7 +152,8 @@
 -- 10. Если B x является множеством, то \Pi (x : A) -> B x тоже является множеством
 
 \func pi-isSet {A : \Type} (B : A -> \Type) (p : \Pi (x : A) -> isSet (B x)) : isSet (\Pi (x : A) -> B x) =>
-  setLem (\lam x y => \Pi (x y : A) (p : x = y) -> B x = B y) (\lam x y => {?}) {?} {?}
+  setLem {\Pi (x : A) -> B x} (\lam f g => \Pi (x : A) -> f x = g x) (\lam f g x y =>
+      ext $ \lam z => \let p' => p z \in p' (f z) (g z) (x z) (y z)) (\lam _ _ => idp) (\lam f => ext $ \lam x => f x)
 
 
 -- 11. Докажите, что если A является множеством, то List A также им является
