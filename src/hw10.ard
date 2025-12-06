@@ -7,10 +7,11 @@
 \import Logic
 \import Logic.Meta
 \import Meta
-\import Paths (*>, pmap, transport)
+\import Paths (*>, pmap, transport, transport2, transportInv)
 \import Paths.Meta
 \import Set.Hedberg
 \import lect04 (Vec, cons)
+\import lect05 (sigmaExt')
 \import lect07 (Decide, no, yes)
 \import lect10
 
@@ -27,10 +28,14 @@
 -- 2. Определите предикат "делится на 3 или на 5" так, чтобы он возвращал утверждения
 --    Докажите, что MultipleOf3Or5 вкладывается в Nat
 
--- ??
-\func isMultipleOf3Or5 (n : Nat) : \Type => mod3 n /= 0 -> mod3 n = 0
+\func isMultipleOf3Or5 (n : Nat) : \Type => (mod3 n = 0) `Or` (\Sigma (mod5 n = 0) (mod3 n /= 0))
 
-\func isMultipleOf3Or5-isProp (n : Nat) : isProp (isMultipleOf3Or5 n) => Impl-isProp prop-isProp
+\func isMultipleOf3Or5-isProp (n : Nat) : isProp (isMultipleOf3Or5 n) => \lam x y => cases (x, y) \with {
+  | inl a, inl b => pmap inl (prop-isProp a b)
+  | inr a, inr b => pmap inr (prop-isProp a b)
+  | inl a, inr b => \let b' => b.2 \in contradiction
+  | inr a, inl b => \let a' => a.2 \in contradiction
+}
 
 \func MultipleOf3Or5 => \Sigma (n : Nat) (isMultipleOf3Or5 n)
 
@@ -38,13 +43,9 @@
 
 \func Mul-inc-isInj : isInj Mul-inc => unfold isInj \lam {x} {y} eq =>
     \let
-     | p => unfold Mul-inc eq
-    \in cases (x.1 arg addPath, x.2 arg addPath, y.1 arg addPath, y.2 arg addPath, eq) \with {
-      | 0, p1, x1, idp, 0, p2, x2, idp, x3 => \let isMultipleOf3Or5-isProp 0
-      | 0, p1, x1, idp, suc x2, p2, x3, idp, ()
-      | suc x1, p1, x2, idp, 0, p2, x3, idp, ()
-      | suc x1, p1, x2, idp, suc x3, p2, x4, idp, x5 => {?}
-    }
+      | p => unfold Mul-inc eq
+      | q => isMultipleOf3Or5-isProp y.1 (rewriteI p x.2) y.2
+    \in sigmaExt' p q
 
 
 -- 3. Мы будем говорить, что тип A тривиален, если существует такой элемент в A, что любой другой элемент в A равен ему
@@ -117,7 +118,8 @@
 
 -- 8. Докажите, что тип с разрешимым равенством является множеством
 
-\func Dec-isSet {A : \Type} (dec : \Pi (x y : A) -> Decide (x = y)) : isSet A => {?}
+\func Dec-isSet {A : \Type} (dec : \Pi (x y : A) -> Decide (x = y)) : isSet A =>
+  setLem (\lam x y => Decide (x = y)) {?} {?} {?}
 --   \lam x y => \case dec x y \with {
 --   | yes a => {?}
 --   | no n => \lam _ _ => contradiction
