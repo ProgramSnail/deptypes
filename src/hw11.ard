@@ -1,33 +1,79 @@
 \import Data.Bool
 \import Function
-\import Logic (<->)
+\import Function.Meta
+\import Logic (<->, prop-isProp)
+\import Meta
+\import Paths.Meta
 \import lect11
 
 
 -- 1. Докажите, что если A : \Prop, то Trunc A эквивалентен A
 
-\func trunc-prop {A : \Prop} : Trunc A <-> A => {?}
+\func trunc-prop {A : \Prop} : Trunc A <-> A => (Trunc-elim id, \lam a => trunc a)
 
 
 -- 2. Докажите следующий закон де Моргана
 
-\func deMorgan (A B C : \Prop) : (\Sigma A (B `Or` C)) <-> ((\Sigma A B) `Or` (\Sigma A C)) => {?}
+\func deMorgan (A B C : \Prop) : (\Sigma A (B `Or` C)) <-> ((\Sigma A B) `Or` (\Sigma A C)) => (\lam x => \case x \with {
+  | (a, inl b) => inl (a, b)
+  | (a, inr c) => inr (a, c)
+}, \lam x => \case x \with {
+  | inl (a, b) => (a, inl b)
+  | inr (a, c) => (a, inr c)
+})
 
+\func deMorgan' (A B C : \Prop) : (\Sigma A (B `Or` C)) <-> ((\Sigma A B) `Or` (\Sigma A C)) =>
+  (\lam x => Or-rec (\lam a => inl (x.1, a)) (\lam b => inr (x.1, b)) x.2,
+   Or-rec (\lam (x : \Sigma A B) => (x.1, inl x.2)) (\lam x => (x.1, inr x.2)))
 
 -- 3. Определите элиминатор для Or через Or-rec, не используя паттерн матчинг на Or
 
 \func Or-elim {A B : \Prop} (C : Or A B -> \Prop)
               (f : \Pi (x : A) -> C (inl x)) (g : \Pi (y : B) -> C (inr y))
-              (p : A `Or` B) : C p => {?}
+              (p : A `Or` B) : C p =>
+  \let
+    | a-prop : isProp A => prop-isProp
+    | b-prop : isProp B => prop-isProp
+    | p' => Or-rec {_} {_} {C p} (\lam x => f x) (\lam y => g y) p
+    | p'' => Or-rec (\lam x => inl x) (\lam y => inr y) p \in {?}
 
 
 -- 4. Докажите, что тип утверждений является множеством
 
-\func prop-isSet : isSet \Prop => {?}
+\func prop-isSet : isSet \Prop => \lam _ _ => prop-isProp
 
+-- 5. Докажите, что функции Prop1-to-Prop2 иProp2-to-Prop1 взаимно обратны и, как следствие, что Prop1 = Prop2
 
--- 5. Докажите, что функции Prop1-to-Prop2 и Prop2-to-Prop1 взаимно обратны и, как следствие, что Prop1 = Prop2
+\func Prop2-to-Prop1'-data (p : Prop1) (prop : isProp p) (x : Prop2-to-Prop1' p prop) : p \elim x
+  | inc a => a
 
+\func prop121 (p : Prop1) : (Prop2-to-Prop1 $ Prop1-to-Prop2 p) = p => iso {Prop2-to-Prop1' p prop-isProp} {p}
+                                                                           (\lam x => Prop2-to-Prop1'-data p prop-isProp x)
+                                                                           (\lam x => inc x)
+                                                                           (\lam x => \case \elim x \with {
+                                                                             | inc a => idp
+                                                                           })
+                                                                           (\lam _ => idp)
+
+\sfunc Prop2-to-Prop1'-data' (p : Prop2) (x : Prop2-to-Prop1' p.1 p.2) : p.1 \elim x
+  | inc a => a
+
+\sfunc prop212 (p : Prop2) : (Prop1-to-Prop2 $ Prop2-to-Prop1 p) = p => unfold Prop2-to-Prop1 $
+                                                                        unfold Prop1-to-Prop2 $
+                                                                        ext ({?}, {?})
+-- ext (iso {Prop2-to-Prop1' p.1 p.2} {p.1}
+--          (\lam x => Prop2-to-Prop1'-data' p x)
+--          (\lam x => inc x)
+--          (\lam x => \case \elim x \with {
+--            | inc a => rewrite Prop2-to-Prop1'.dataIsProp idp
+--          })
+--          (\lam x => {?})
+-- , {?})
+
+\func Prop1-eq-Prop2 : Prop1 = Prop2 => iso Prop1-to-Prop2
+                                            Prop2-to-Prop1
+                                            prop121
+                                            prop212
 
 -- Можно сделать только одно из упражнений 6a, 6b на выбор
 
@@ -48,13 +94,17 @@
 \func isInjective (X : \Type) =>
   \Pi {A B : \Type} (f : A -> X) (i : A -> B) (p : isInj i) -> \Sigma (l : B -> X) (l o i = f)
 
-\func Prop-isInjective : isInjective \Prop => {?}
+\func Prop-isInjective : isInjective \Prop => \lam {A} {B} f i p => \let j : B -> \Prop => \lam b => {?}
+                                                                    \in {?}
 
 
 -- Можно сделать только одно из упражнений 7a, 7b на выбор
 
 -- 7a. Докажите, что (Bool = Bool) = Bool
 
-\func BoolAut : (Bool = Bool) = Bool => {?}
+\func BoolAut : (Bool = Bool) = Bool => iso {?}
+                                            {?}
+                                            {?}
+                                            {?}
 
 -- 7b. Докажите, что (n+m)-элементное множество равно размеченному объединению n- и m-элементных множеств
