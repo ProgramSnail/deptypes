@@ -3,6 +3,7 @@
 \import Function.Meta
 \import Logic (<->, prop-isProp)
 \import Meta
+\import Paths (inv, pmap)
 \import Paths.Meta
 \import lect11
 
@@ -26,6 +27,9 @@
   (\lam x => Or-rec (\lam a => inl (x.1, a)) (\lam b => inr (x.1, b)) x.2,
    Or-rec (\lam (x : \Sigma A B) => (x.1, inl x.2)) (\lam x => (x.1, inr x.2)))
 
+\func deMorgan-swap (A B C : \Prop) : (\Sigma (B `Or` C) A) -> (\Sigma B A) `Or` (\Sigma C A) =>
+  \lam x => Or-rec (\lam a => inl (a, x.2)) (\lam b => inr (b, x.2)) x.1
+
 -- 3. Определите элиминатор для Or через Or-rec, не используя паттерн матчинг на Or
 
 \func Or-elim {A B : \Prop} (C : Or A B -> \Prop)
@@ -34,8 +38,17 @@
   \let
     | a-prop : isProp A => prop-isProp
     | b-prop : isProp B => prop-isProp
-    | p' => Or-rec {_} {_} {C p} (\lam x => f x) (\lam y => g y) p
-    | p'' => Or-rec (\lam x => inl x) (\lam y => inr y) p \in {?}
+    | h => Or-rec (\lam x => inl x) (\lam y => inr y) p
+    | t : C p => Or-rec (\lam (x, p-eq) =>
+        \let h : C (inl x) = C p => {?} \in
+        transport id h (f x)
+    ) (\lam (y, p-eq) =>
+        \let h : C (inr y) = C p => {?} \in
+        transport id h (g y)) $
+    deMorgan-swap (p = p) A B (p, idp)
+    -- (deMorgan _ A B).1 (p, p)
+    -- | p'' => {?} -- Or-rec (\lam x => inl x) (\lam y => inr y) p \in {?}
+  \in t
 
 
 -- 4. Докажите, что тип утверждений является множеством
@@ -83,7 +96,14 @@
 
 \func isCogenerator (C : \Type) => \Pi {A B : \Set} (f g : A -> B) (p : \Pi (h : B -> C) -> h o f = h o g) -> f = g
 
-\func PropIsCogenerator : isCogenerator \Prop => {?}
+\func PropIsCogenerator : isCogenerator \Prop =>
+  \lam {A} {B} f g p =>
+    ext \lam x =>
+        \let
+          | p' => p (\lam y => y = f x)
+          | eq-eq => unfold (o) $ pmap (\lam f => f x) p'
+          | eq => unfold id $ transport id eq-eq idp
+        \in inv eq
 
 -- 6b. Тип X называется инъективным, если для любой функции f : A -> X и любой инъекции i : A -> B
 --     существует функция l : B -> X такая, что l o i = f
