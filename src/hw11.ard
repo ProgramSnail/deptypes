@@ -1,10 +1,15 @@
+\import Algebra.Meta
 \import Data.Bool
+\import Equiv
+\import Equiv.Univalence
 \import Function
 \import Function.Meta
 \import Logic (<->, prop-isProp)
+\import Logic.Meta
 \import Meta
 \import Paths (inv, pmap)
 \import Paths.Meta
+\import lect02 (==)
 \import lect11
 
 
@@ -97,7 +102,7 @@
 \func isCogenerator (C : \Type) => \Pi {A B : \Set} (f g : A -> B) (p : \Pi (h : B -> C) -> h o f = h o g) -> f = g
 
 \func PropIsCogenerator : isCogenerator \Prop =>
-  \lam {A} {B} f g p =>
+  \lam f g p =>
     ext \lam x =>
         \let
           | p' => p (\lam y => y = f x)
@@ -114,17 +119,40 @@
 \func isInjective (X : \Type) =>
   \Pi {A B : \Type} (f : A -> X) (i : A -> B) (p : isInj i) -> \Sigma (l : B -> X) (l o i = f)
 
-\func Prop-isInjective : isInjective \Prop => \lam {A} {B} f i p => \let j : B -> \Prop => \lam b => {?}
-                                                                    \in {?}
+\func Prop-isInjective : isInjective \Prop => \lam {A} {B} f i p => \let j : B -> \Prop => \lam b => ∃ (a : A) (\Sigma (i a = b) (f a))
+                                                                    -- ∃ (a : A) (\Sigma (i a = b) (f a))
+                                                                    \in (j, ext \lam x => iso {?} {?} {?} {?})
 
 
 -- Можно сделать только одно из упражнений 7a, 7b на выбор
 
 -- 7a. Докажите, что (Bool = Bool) = Bool
 
-\func BoolAut : (Bool = Bool) = Bool => iso {?}
-                                            {?}
-                                            {?}
-                                            {?}
+-- coe (\lam i => id (p @ i)) true right
+-- transport id p true
+\func BoolAut : (Bool = Bool) = Bool =>
+  iso
+    (\lam p => transport id p true)
+    (\lam b => iso {Bool} {Bool} (`== b) (`== b) (\lam x => cases (x, b) idp) (\lam x => cases (x, b) idp))
+    (\lam p =>
+      cases (transport id p true arg addPath) \with {
+        | false, pt => {?}
+        | true, pt => {?}
+      })
+    -- pmap (\lam h => transport id h true)
+    (\lam b => \case \elim b \with {
+      | false => idp
+      | true => idp
+    } )
+
+-- \func BoolAut' : (Bool = Bool) = Bool =>
+--   iso {Bool = Bool} {Bool}
+--       (\lam p => sec {=-to-QEquiv p} false)
+--       (\lam b => QEquiv-to-= \new QEquiv (`== b) (`== b) (\lam x => cases (x, b) idp) (\lam x => cases (x, b) idp))
+--       (\lam p => {?})
+--       (\lam b => \case \elim b \with {
+--         | false => {?}
+--         | true => {?}
+--       } )
 
 -- 7b. Докажите, что (n+m)-элементное множество равно размеченному объединению n- и m-элементных множеств
