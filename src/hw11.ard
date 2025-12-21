@@ -62,6 +62,9 @@
 
 -- 5. Докажите, что функции Prop1-to-Prop2 иProp2-to-Prop1 взаимно обратны и, как следствие, что Prop1 = Prop2
 
+-- use univalence, scase
+-- HLevel.isProp levelprop
+
 \func Prop2-to-Prop1'-data (p : Prop1) (prop : isProp p) (x : Prop2-to-Prop1' p prop) : p \elim x
   | inc a => a
 
@@ -127,6 +130,8 @@
 -- Можно сделать только одно из упражнений 7a, 7b на выбор
 
 -- 7a. Докажите, что (Bool = Bool) = Bool
+
+-- Equiv.equals, on all values, Equiv.isInj
 
 -- coe (\lam i => id (p @ i)) true right
 -- transport id p true
