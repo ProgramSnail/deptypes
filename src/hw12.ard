@@ -1,3 +1,4 @@
+\import Data.Bool
 \import Function (o)
 \import Function.Meta
 \import HLevel
@@ -6,6 +7,7 @@
 \import Paths
 \import Paths.Meta
 \import hw07 (contrProp)
+\import lect10 (mod3)
 \import lect12 \hiding (Int', pos, neg)
 
 -- 1. Определите функцию negPred : Int -> Int такую, что negPred x = x, если x > 0, и negPred x = x - 1, если x <= 0
@@ -50,10 +52,11 @@
 
 \data BinNat
   | B0
-  | Bx2 BinNat \with {
-    | B0 => B0
-  }
-  | Bx2+1 BinNat
+  | Bx2 BinNat
+--   \with {
+--     | B0 => B0
+--   }
+  | Bx2_1 BinNat
 
 -- 4. Докажите, что функция pred сюръективна
 
@@ -114,15 +117,72 @@
   => (=, =-isInj)
 
 \func cantor2 (A : \Set) (f : A -> Subs A) (p : isSurj f) : Empty
-  => {?}
+  => \let
+      | s-t => p (\lam x => Not $ f x x)
+     \in \case s-t \with {
+      | inP (s, s-surj) =>
+        contrProp
+          {f s s}
+          (\lam is-fss => \let not-fss => rewrite s-surj is-fss \in not-fss)
+          (\lam not-fss => \let is-fss => rewrite s-surj not-fss \in \case is-fss not-fss)
+     }
 
 -- Optional
 -- 9. Постройте функции Nat -> BinNat и BinNat -> Nat и докажите, что они взаимно обратны
 
-\func NatToBinNat (n : Nat) : BinNat => {?}
+\func divMod2 (_ : Nat) : \Sigma Bool Nat
+  | 0 => (false, 0)
+  | 1 => (true, 0)
+  | suc (suc n) => \let (m, d) => divMod2 n \in
+                   (m, suc d)
 
-\func BinNatToNat (b : BinNat) : Nat => {?}
+\func div2 (_ : Nat) : Nat
+  | 0 => 0
+  | 1 => 0
+  | suc (suc n) => suc (div2 n)
 
-\func nbn (n : Nat) : BinNatToNat (NatToBinNat n) = n => {?}
+\func mod2 (_ : Nat) : Bool
+  | 0 => false
+  | 1 => true
+  | suc (suc n) => mod2 n
+
+\func NatToBinNat'' (n : Nat) : BinNat \elim n
+  | 0 => B0
+  | suc n => cases (Nat.divMod 2 n arg addPath, Nat.divModProp 2 n arg addPath) \with {
+    | (0, m), _, _, _ => Bx2 {?} -- (NatToBinNat'' m)
+    | (1, m), _, _, _ => Bx2_1 {?} -- (NatToBinNat'' m)
+    | (suc (suc n1),n2), p, x, p1 => {?} -- \case unfold (Nat.mod) $ unfold (Nat.div) $ rewrite p x
+  }
+
+\func NatToBinNat' (fuel n : Nat) : BinNat \elim fuel, n
+  | _, 0 => B0
+  | suc fuel, suc n => \case divMod2 n \with {
+    | (false, m) => Bx2 (NatToBinNat' fuel m)
+    | (true, m) => Bx2_1 (NatToBinNat' fuel m)
+  }
+  | 0, suc n => B0 -- should be impossible
+
+\func NatToBinNat (n : Nat) : BinNat => NatToBinNat' n n
+
+\func mult2 (n : Nat) : Nat \elim  n
+  | 0 => 0
+  | 1 => 2
+  | suc n => suc (suc (mult2 n))
+
+\func BinNatToNat (b : BinNat) : Nat \elim b
+  | B0 => 0
+  | Bx2 b => mult2 (BinNatToNat b)
+  | Bx2_1 b => suc $ mult2 (BinNatToNat b)
+
+\func nbn (n : Nat) : BinNatToNat (NatToBinNat n) = n \elim n
+  | 0 => idp
+  | suc n => cases (divMod2 n arg addPath) \with {
+    | (false, m), p => \let
+        | p' => {?} -- pmap mult2 $ nbn m
+    \in unfold NatToBinNat $ rewrite p {?}
+    | (true, m), p => \let
+      | p' => {?} -- pmap suc $ pmap mult2 $ nbn m
+      \in unfold NatToBinNat $ rewrite p {?}
+  }
 
 \func bnb (b : BinNat) : NatToBinNat (BinNatToNat b) = b => {?}
