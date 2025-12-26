@@ -1,16 +1,47 @@
 \import Function (o)
+\import Function.Meta
+\import HLevel
 \import Logic
+\import Meta
+\import Paths
+\import Paths.Meta
+\import hw07 (contrProp)
 \import lect12 \hiding (Int', pos, neg)
 
 -- 1. Определите функцию negPred : Int -> Int такую, что negPred x = x, если x > 0, и negPred x = x - 1, если x <= 0
 
-\func negPred (x : Int) : Int => {?}
+\func negPred (x : Int) : Int \elim x
+  | zero => -1
+  | pos n => pos n
+  | neg n => neg $ suc n
 
 -- 2. Определите функции сложения и умножения для Int
 
-\func \infixl 6 + (x y : Int) : Int => {?}
+\func incr (x : Int) : Int \elim x
+  | zero => 1
+  | pos n => pos $ suc n
+  | neg (suc n) => neg n
 
-\func \infixl 7 * (x y : Int) : Int => {?}
+\func decr (x : Int) : Int \elim x
+  | zero => -1
+  | pos (suc n) => pos n
+  | neg n => neg $ suc n
+
+\func negative' (x : Int) : Int \elim x
+  | pos n => neg n
+  | neg n => pos n
+
+\func \infixl 6 + (x y : Int) : Int \elim x
+  | zero => y
+  | pos (suc n) => incr (pos n + y)
+  | neg (suc n) => decr (neg n + y)
+
+\func \infixl 6 - (x y : Int) : Int => x + negative' y
+
+\func \infixl 7 * (x y : Int) : Int \elim x
+  | zero => 0
+  | pos (suc n) => pos n * y + y
+  | neg (suc n) => neg n * y - y
 
 -- 3. Определите тип данных BinNat для бинарных натуральных чисел
 --    У него должно быть три конструктора: для 0, для чисел вида 2*n и чисел вида 2*n+1
@@ -18,6 +49,11 @@
 --    Используйте типы данных с условиями, чтобы вычислительно отождествить различные нули
 
 \data BinNat
+  | B0
+  | Bx2 BinNat \with {
+    | B0 => B0
+  }
+  | Bx2+1 BinNat
 
 -- 4. Докажите, что функция pred сюръективна
 
@@ -25,24 +61,42 @@
   | 0 => 0
   | suc n => n
 
-\func pred-is-sur : isSurj pred => {?}
+\func pred-is-sur : isSurj pred => unfold isSurj \lam b => inP (suc b, idp)
 
 -- 5. Докажите, что функция suc не сюръективна
 
-\func suc-is-not-sur (p : isSurj suc) : Empty => {?}
+\func suc-is-not-sur (p : isSurj suc) : Empty => \case p zero \with {
+  | inP (a, a-surj) => \case a-surj
+}
 
 -- 6. Пусть f : A -> B и g : B -> C ─ некоторые функции
 --    Докажите, что если f и g сюръективны, то g o f также сюръективна
 --    Докажите, что если g o f сюръективна, то g также сюръективна
 
-\func o-sur {A B C : \Type} (f : A -> B) (g : B -> C) (p : isSurj f) (q : isSurj g) : isSurj (g o f) => {?}
+\func o-sur {A B C : \Type} (f : A -> B) (g : B -> C) (p : isSurj f) (q : isSurj g) : isSurj (g o f) => \lam c => \case q c \with {
+  | inP (b, b-surj) => \case p b \with {
+    | inP (a, a-surj) => inP (a, rewriteI b-surj $ pmap g a-surj)
+  }
+}
 
-\func o-sur' {A B C : \Type} (f : A -> B) (g : B -> C) (p : isSurj (g o f)) : isSurj g => {?}
+\func o-sur' {A B C : \Type} (f : A -> B) (g : B -> C) (p : isSurj (g o f)) : isSurj g => \lam b => \case p b \with {
+  | inP (a, a-surj) => inP (f a, a-surj)
+}
 
 -- 7. Определите множество конечных подмножеств множества A,
 --    то есть списков элементов A с точностью до перестановок и повторений элементов
 
-\data Set (A : \Set) : \Set
+\truncated \data Set (A : \Set) : \Set
+  | set-singleton A
+  | set-add A (Set A)
+  | set-eq-repeat (a : A) (s : Set A) (i : I) \elim i {
+    | left => set-add a (set-add a s)
+    | right => set-add a s
+  }
+  | set-eq-permute (a b : A) (s : Set A) (i : I) \elim i {
+    | left => set-add a (set-add b s)
+    | right => set-add b (set-add a s)
+  }
 
 -- 8. Докажите теорему Кантора
 
