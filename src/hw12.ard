@@ -133,7 +133,7 @@
 \func bsuc (b : BinNat) : BinNat \elim b
   | B0 => Bx2_1 B0
   | Bx2 b => Bx2_1 b
-  | Bx2_1 b => Bx2 $ bsuc b 
+  | Bx2_1 b => Bx2 $ bsuc b
 
 \func NatToBinNat (n : Nat) : BinNat \elim n
   | zero => B0
@@ -178,11 +178,11 @@
   | 0, 0, ()
   | suc n, suc m, p => \let p' => pmap pred $ pmap pred $ p \in not-x2-eq-x2_1 p'
 
-\func b-is-zero {b : BinNat} (p : 0 = BinNatToNat b) : b = B0 \elim b, p
+\lemma b-is-zero {b : BinNat} (p : 0 = BinNatToNat b) : b = B0 \elim b, p
   | B0, p => idp
   | Bx2 b, p => pmap Bx2 $ b-is-zero (nat-zero-sum-left p)
 
-\func bnb' (a b : BinNat) (p : BinNatToNat a = BinNatToNat b) : a = b \elim a, b, p
+\lemma bnb' (a b : BinNat) (p : BinNatToNat a = BinNatToNat b) : a = b \elim a, b, p
   | B0, B0, _ => idp
   | B0, Bx2 b, p => \let
     | p' => nat-zero-sum-left p
@@ -197,7 +197,7 @@
   | Bx2_1 a, Bx2 b, p => \case not-x2-eq-x2_1 (inv p)
   | Bx2 a, Bx2_1 b, p => \case not-x2-eq-x2_1 p
 
-\func bnb (b : BinNat) : NatToBinNat (BinNatToNat b) = b =>
+\lemma bnb (b : BinNat) : NatToBinNat (BinNatToNat b) = b =>
   \let
     | n => BinNatToNat b
     | p : n = BinNatToNat b => idp
