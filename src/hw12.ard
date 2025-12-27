@@ -1,9 +1,12 @@
+\import Algebra.Meta
 \import Arith.Int
+\import Arith.Nat
 \import Data.Bool
 \import Function (o)
 \import Function.Meta
 \import HLevel
 \import Logic
+\import Logic.Meta
 \import Meta
 \import Paths
 \import Paths.Meta
@@ -127,59 +130,77 @@
 -- Optional
 -- 9. Постройте функции Nat -> BinNat и BinNat -> Nat и докажите, что они взаимно обратны
 
-\func divMod2 (_ : Nat) : \Sigma Bool Nat
-  | 0 => (false, 0)
-  | 1 => (true, 0)
-  | suc (suc n) => \let (m, d) => divMod2 n \in
-                   (m, suc d)
+\func bsuc (b : BinNat) : BinNat \elim b
+  | B0 => Bx2_1 B0
+  | Bx2 b => Bx2_1 b
+  | Bx2_1 b => Bx2 $ bsuc b 
 
-\func div2 (_ : Nat) : Nat
-  | 0 => 0
-  | 1 => 0
-  | suc (suc n) => suc (div2 n)
-
-\func mod2 (_ : Nat) : Bool
-  | 0 => false
-  | 1 => true
-  | suc (suc n) => mod2 n
-
-\func NatToBinNat'' (n : Nat) : BinNat \elim n
-  | 0 => B0
-  | suc n => cases (Nat.divMod 2 n arg addPath, Nat.divModProp 2 n arg addPath) \with {
-    | (0, m), _, _, _ => Bx2 {?} -- (NatToBinNat'' m)
-    | (1, m), _, _, _ => Bx2_1 {?} -- (NatToBinNat'' m)
-    | (suc (suc n1),n2), p, x, p1 => {?} -- \case unfold (Nat.mod) $ unfold (Nat.div) $ rewrite p x
-  }
-
-\func NatToBinNat' (fuel n : Nat) : BinNat \elim fuel, n
-  | _, 0 => B0
-  | suc fuel, suc n => \case divMod2 (suc n) \with {
-    | (false, m) => Bx2 (NatToBinNat' fuel m)
-    | (true, m) => Bx2_1 (NatToBinNat' fuel m)
-  }
-  | 0, suc n => B0 -- should be impossible
-
-\func NatToBinNat (n : Nat) : BinNat => NatToBinNat' n n
-
-\func mult2 (n : Nat) : Nat \elim  n
-  | 0 => 0
-  | 1 => 2
-  | suc n => suc (suc (mult2 n))
+\func NatToBinNat (n : Nat) : BinNat \elim n
+  | zero => B0
+  | suc n => bsuc $ NatToBinNat n
 
 \func BinNatToNat (b : BinNat) : Nat \elim b
   | B0 => 0
-  | Bx2 b => mult2 (BinNatToNat b)
-  | Bx2_1 b => suc $ mult2 (BinNatToNat b)
+  | Bx2 b => BinNatToNat b Nat.* 2
+  | Bx2_1 b => suc $ BinNatToNat b Nat.* 2
+
+
+\func nbn'' (b : BinNat) : suc (BinNatToNat b) = BinNatToNat (bsuc b) \elim b
+  | B0 => idp
+  | Bx2 b => equation
+  | Bx2_1 b => rewriteI (nbn'' b) equation
+
+\func nbn' (n : Nat) : suc (BinNatToNat (NatToBinNat n)) = BinNatToNat (NatToBinNat (suc n))
+  =>  rewrite (nbn'' (NatToBinNat n)) idp
 
 \func nbn (n : Nat) : BinNatToNat (NatToBinNat n) = n \elim n
-  | 0 => idp
-  | suc n => cases (divMod2 n arg addPath) \with {
-    | (false, m), p => \let
-        | p' => {?} -- pmap mult2 $ nbn m
-    \in unfold NatToBinNat $ rewrite p {?}
-    | (true, m), p => \let
-      | p' => {?} -- pmap suc $ pmap mult2 $ nbn m
-      \in unfold NatToBinNat $ rewrite p {?}
-  }
+  | zero => idp
+  | suc n => \let
+    | p => pmap suc $ nbn n
+    | q => nbn' n
+  \in rewriteI q p
 
-\func bnb (b : BinNat) : NatToBinNat (BinNatToNat b) = b => {?}
+\func nat-zero-sum-left {n m : Nat} (p : 0 = n Nat.+ m) : 0 = n \elim n, m, p
+  | 0, 0, p => idp
+  | suc n, 0, ()
+
+\func nat-zero-sum-right {n m : Nat} (p : 0 = n Nat.+ m) : 0 = m \elim n, m, p
+  | 0, 0, p => idp
+  | suc n, 0, ()
+
+\lemma nat-x2-eq {n m : Nat} (p : n Nat.* 2 = m Nat.* 2) : n = m
+  => NatSemiring.cancel_*-right {n} {m} {2} (\lam p => \case p) p
+
+\lemma nat-x2_1-eq {n m : Nat} (p : n Nat.* 2 Nat.+ 1 = m Nat.* 2 Nat.+ 1) : n = m
+  => nat-x2-eq $ NatSemiring.cancel-right 1 p
+
+\lemma not-x2-eq-x2_1 {n m : Nat} (p : n Nat.* 2 = m Nat.* 2 Nat.+ 1) : Empty \elim n, m, p
+  | 0, 0, ()
+  | suc n, suc m, p => \let p' => pmap pred $ pmap pred $ p \in not-x2-eq-x2_1 p'
+
+\func b-is-zero {b : BinNat} (p : 0 = BinNatToNat b) : b = B0 \elim b, p
+  | B0, p => idp
+  | Bx2 b, p => pmap Bx2 $ b-is-zero (nat-zero-sum-left p)
+
+\func bnb' (a b : BinNat) (p : BinNatToNat a = BinNatToNat b) : a = b \elim a, b, p
+  | B0, B0, _ => idp
+  | B0, Bx2 b, p => \let
+    | p' => nat-zero-sum-left p
+    | q => b-is-zero p'
+  \in inv $ pmap Bx2 q
+  | Bx2 a, B0, p => \let
+    | p' => nat-zero-sum-left $ inv p
+    | q => b-is-zero p'
+  \in pmap Bx2 q
+  | Bx2 a, Bx2 b, p => pmap Bx2 $ bnb' a b $ nat-x2-eq p
+  | Bx2_1 a, Bx2_1 b, p => pmap Bx2_1 $ bnb' a b $ nat-x2_1-eq p
+  | Bx2_1 a, Bx2 b, p => \case not-x2-eq-x2_1 (inv p)
+  | Bx2 a, Bx2_1 b, p => \case not-x2-eq-x2_1 p
+
+\func bnb (b : BinNat) : NatToBinNat (BinNatToNat b) = b =>
+  \let
+    | n => BinNatToNat b
+    | p : n = BinNatToNat b => idp
+    | q => rewrite p $ nbn n
+  \in bnb' (NatToBinNat (BinNatToNat b)) b q
+
