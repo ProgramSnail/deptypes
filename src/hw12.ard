@@ -40,10 +40,10 @@
 --   | neg (suc n) => neg n * y - y
 
 \func \infixl 7 * (x y : Int) : Int \elim x, y
-  | pos n, pos m => n * m
-  | neg n, neg m => n * m
-  | pos n, neg m => negative' $ n * m
-  | neg n, pos m => negative' $ n * m
+  | pos n, pos m => pos $ n Nat.* m
+  | neg (suc n), neg (suc m) => pos $ suc n Nat.* suc m
+  | pos n, neg (suc m) => neg $ n Nat.* suc m
+  | neg (suc n), pos m => neg $ suc n Nat.* m
 
 -- 3. Определите тип данных BinNat для бинарных натуральных чисел
 --    У него должно быть три конструктора: для 0, для чисел вида 2*n и чисел вида 2*n+1
