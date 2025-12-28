@@ -42,7 +42,7 @@
 
 \func size-le {S : SetSpec} (s : S) (n : Nat) : \Prop => {?}
 
-\func size {S : FinSetSpec} (d : DecSet S.A) (s : S) : Nat => {?}
+\func size {A : DecSet} {S : FinSetSpec {A}} (s : S) : Nat => {?}
 
 
 -- Optional
