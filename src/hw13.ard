@@ -1,38 +1,218 @@
+\import Algebra.Meta
+\import Data.Array (++)
 \import Data.Bool
+\import Data.Or
+\import Equiv
 \import Function
+\import Function.Meta
+\import Logic
+\import Logic.Meta
+\import Meta
+\import Paths
+\import Paths.Meta
+\import Relation.Equivalence
 \import Set
+\import lect11 (equivalence=>equality)
 \import lect13
 
 
 -- 1. Докажите, что add x (add x s) = add x s и add x (add y s) = add y (add x s)
 
-\func add-idemp {S : SetSpec} (x : S.A) (s : S) : add x (add x s) = add x s => {?}
+\func add-idemp {S : SetSpec} (x : S.A) (s : S) : add x (add x s) = add x s => set-ext (\lam _ => (
+  \lam elem => \case add-prop elem \with {
+    | byLeft eq => rewrite eq add-head
+    | byRight elem' => elem'
+  },
+  \lam elem => add-tail elem))
 
-\func add-swap {S : SetSpec} (x y : S.A) (s : S) : add x (add y s) = add y (add x s) => {?}
+\func add-swap {S : SetSpec} (x y : S.A) (s : S) : add x (add y s) = add y (add x s) => set-ext (\lam _ => (
+  \lam elem => \case add-prop elem \with {
+    | byLeft eq => rewrite eq $ add-tail add-head
+    | byRight elem' => \case add-prop elem' \with {
+      | byLeft eq => rewrite eq add-head
+      | byRight elem'' => add-tail $ add-tail elem''
+    }
+  },
+  \lam elem => \case add-prop elem \with {
+    | byLeft eq => rewrite eq $ add-tail add-head
+    | byRight elem' => \case add-prop elem' \with {
+      | byLeft eq => rewrite eq add-head
+      | byRight elem'' => add-tail $ add-tail elem''
+    }
+  }))
 
 
 -- 2. Докажите, что множество подмножеств является инстансом SetSpec
 
-\instance subsets {A : \Set} : SetSpec {A} (A -> \Prop) => {?}
-
+\instance subsets {A : \Set} : SetSpec {A} (A -> \Prop)
+  | isElem x f => f x
+  | set-ext f => ext $ \lam x => \let eq => f x \in equivalence=>equality (\new Equiv {
+    | f => eq.1
+    | ret => eq.2
+    | ret_f _ => prop-isProp _ _
+    | sec => eq.2
+    | f_sec _ => prop-isProp _ _
+  })
+  | empty => \lam _ => Empty
+  | empty-prop x => x
+  | add a f => \lam x => f x || (x = a)
+  | add-head => byRight idp
+  | add-tail elem => byLeft elem
+  | add-prop elem => \case elem \with {
+    | byLeft elem' => byRight elem'
+    | byRight eq => byLeft $ inv eq
+  }
 
 -- 3. Докажите, что множество подмножеств является наибольшим инстансом, то есть любой другой вкладывается в него
 
-\func subsets-largest (S : SetSpec) : \Sigma (f : S -> S.A -> \Prop) (isInj f) => {?}
-
+\func subsets-largest (S : SetSpec) : \Sigma (f : S -> S.A -> \Prop) (isInj f) => (
+  \lam s x => isElem x s,
+  \lam f => set-ext $ \lam x => \let f' => pmap (\lam g => g x) f \in rewrite f' (id, id))
 
 -- 4. Определите функцию isEmpty для ArraySet и для произвольного конечного множества
 
-\func isEmptyArraySet {A : \Set} (xs : ArraySet A) : Bool => {?}
+\func not-in-nil {A : \Set} {a : A} (p : In a nil) : Empty \elim p
+  | inP x => \case x.1
 
-\func isEmptySet {S : FinSetSpec} (s : S) : Bool => {?}
+\func isEmptyArraySet {A : \Set} (xs : ArraySet A) : Bool \elim xs
+  | in~ nil => true
+  | in~ (_ :: _) => false
+  | ~-equiv nil nil r i => true
+  | ~-equiv nil (a :: _) r => \case not-in-nil $ (r a).2 (inP (0, idp))
+  | ~-equiv (a :: _) nil r => \case not-in-nil $ (r a).1 (inP (0, idp))
+  | ~-equiv (_ :: _) (_ :: _) r i => false
+-- isEmptySet {ArraySetSet {A}} xs
 
+\func isEmptySet {S : FinSetSpec} (s : S) : Bool =>
+  \let xs => rewriteI arraySet=Set s \in isEmptyArraySet xs
+-- \scase set-fin s \with {
+--   | inP (nil, _) => true
+--   | inP (_ :: _, _) => false
+--   | truncP (inP (nil, _)) (inP (nil, _)) i => true
+--   | truncP (inP (nil, f)) (inP (a :: _, g)) => \case not-in-nil $ (f a).2 $ (g a).1 (inP (0, idp))
+--   | truncP (inP (a :: _, f)) (inP (nil, g)) => \case not-in-nil $ (g a).2 $ (f a).1 (inP (0, idp))
+--   | truncP (inP (_ :: _, _)) (inP (_ :: _, _)) i => false
+-- }
 
 -- 5. Определите функцию union {A : \Set} : S -> S -> S для ArraySet и для произвольного S (удовлетворяющего FinSetSpec)
 
+\func unionArraySet {A : \Set} (xs ys : ArraySet A) : ArraySet A \elim xs, ys
+  | in~ a, in~ b => in~ $ a ++ b
+  | in~ a, ~-equiv b1 b2 r => ~-pequiv $ \lam x => (
+    \lam is-in => \case \elim is-in \with {
+      | inP (i, eq) => \case ++.split-index i \with {
+        | inl (il, il-eq) =>
+          \let
+            | t => ++.++_index-left {_} {a} {b1} il
+            | eq' => rewrite t $ rewrite il-eq eq
+            | t' => ++.++_index-left {_} {a} {b2} il
+            | eq'' => rewrite eq' t'
+          \in inP (++.index-left il, eq'')
+        | inr (ir, ir-eq) =>
+          \let
+            | t => ++.++_index-right {_} {a} {b1} {ir}
+            | eq' => rewrite t $ rewrite ir-eq eq
+            | q => (r x).1 $ inP (ir, eq')
+          \in \case q \with {
+            | inP (ir2, eq'2) =>
+              \let
+                | t' => ++.++_index-right {_} {a} {b2} {ir2}
+                | eq'' => rewrite eq'2 t'
+              \in inP (++.index-right ir2, eq'')
+          }
+      }
+    },
+    -- NOTE: very similar to pred
+    \lam is-in => \case \elim is-in \with {
+      | inP (i, eq) => \case ++.split-index i \with {
+        | inl (il, il-eq) =>
+          \let
+            | t => ++.++_index-left {_} {a} {b2} il
+            | eq' => rewrite t $ rewrite il-eq eq
+            | t' => ++.++_index-left {_} {a} {b1} il
+            | eq'' => rewrite eq' t'
+          \in inP (++.index-left il, eq'')
+        | inr (ir, ir-eq) =>
+          \let
+            | t => ++.++_index-right {_} {a} {b2} {ir}
+            | eq' => rewrite t $ rewrite ir-eq eq
+            | q => (r x).2 $ inP (ir, eq')
+          \in \case q \with {
+            | inP (ir1, eq'1) =>
+              \let
+                | t' => ++.++_index-right {_} {a} {b1} {ir1}
+                | eq'' => rewrite eq'1 t'
+              \in inP (++.index-right ir1, eq'')
+          }
+      }
+    })
+  -- NOTE: very similar to pred
+  | ~-equiv a1 a2 r, in~ b => ~-pequiv $ \lam x => (
+    \lam is-in => \case \elim is-in \with {
+      | inP (i, eq) => \case ++.split-index i \with {
+        | inr (ir, ir-eq) =>
+          \let
+            | t => ++.++_index-right {_} {a1} {b} {ir}
+            | eq' => rewrite t $ rewrite ir-eq eq
+            | t' => ++.++_index-right {_} {a2} {b} {ir}
+            | eq'' => rewrite eq' t'
+          \in inP (++.index-right ir, eq'')
+        | inl (il, il-eq) =>
+          \let
+            | t => ++.++_index-left {_} {a1} {b} il
+            | eq' => rewrite t $ rewrite il-eq eq
+            | q => (r x).1 $ inP (il, eq')
+          \in \case q \with {
+            | inP (il2, eq'2) =>
+              \let
+                | t' => ++.++_index-left {_} {a2} {b} il2
+                | eq'' => rewrite eq'2 t'
+              \in inP (++.index-left il2, eq'')
+          }
+      }
+    },
+  -- NOTE: very similar to pred
+    \lam is-in => \case \elim is-in \with {
+      | inP (i, eq) => \case ++.split-index i \with {
+        | inr (ir, ir-eq) =>
+          \let
+            | t => ++.++_index-right {_} {a2} {b} {ir}
+            | eq' => rewrite t $ rewrite ir-eq eq
+            | t' => ++.++_index-right {_} {a1} {b} {ir}
+            | eq'' => rewrite eq' t'
+          \in inP (++.index-right ir, eq'')
+        | inl (il, il-eq) =>
+          \let
+            | t => ++.++_index-left {_} {a2} {b} il
+            | eq' => rewrite t $ rewrite il-eq eq
+            | q => (r x).2 $ inP (il, eq')
+          \in \case q \with {
+            | inP (il1, eq'1) =>
+              \let
+                | t' => ++.++_index-left {_} {a1} {b} il1
+                | eq'' => rewrite eq'1 t'
+              \in inP (++.index-left il1, eq'')
+          }
+      }
+    })
+-- unionFinSet {ArraySetSet {A}} xs ys
+
+\func unionFinSet {S : FinSetSpec} (s t : S) : S =>
+  \let
+    | xs => rewriteI arraySet=Set s
+    | ys => rewriteI arraySet=Set t
+  \in rewriteI arraySet=Set $ unionArraySet xs ys
 
 -- 6. Определите функцию intersection {A : DecSet} : S -> S -> S для ArraySet и для произвольного S (удовлетворяющего FinSetSpec)
 
+\func intersectionArraySet {A : DecSet} (xs ys : ArraySet A) : ArraySet A => {?}
+-- intersectionSet {ArraySetSet {A}} xs ys
+
+\func intersectionSet {A : DecSet} {S : FinSetSpec{A}} (s t : S) : S =>
+  \let
+    | xs => rewriteI arraySet=Set s
+    | ys => rewriteI arraySet=Set t
+  \in rewriteI arraySet=Set $ intersectionArraySet xs ys
 
 -- 7. Мы не можем определить функцию size в общем случае, но мы можем определить предикат S -> Nat -> \Prop,
 --    соответствующий \lam xs n => size xs <= n
@@ -43,7 +223,6 @@
 \func size-le {S : SetSpec} (s : S) (n : Nat) : \Prop => {?}
 
 \func size {A : DecSet} {S : FinSetSpec {A}} (s : S) : Nat => {?}
-
 
 -- Optional
 -- 8. Определите предикат isFin : \Type -> \Prop так,
