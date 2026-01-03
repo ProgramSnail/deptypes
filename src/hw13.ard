@@ -1,5 +1,5 @@
 \import Algebra.Meta
-\import Data.Array (++)
+\import Data.Array (++, count, filter, find, keep)
 \import Data.Bool
 \import Data.Or
 \import Equiv
@@ -205,7 +205,66 @@
 
 -- 6. Определите функцию intersection {A : DecSet} : S -> S -> S для ArraySet и для произвольного S (удовлетворяющего FinSetSpec)
 
-\func intersectionArraySet {A : DecSet} (xs ys : ArraySet A) : ArraySet A => {?}
+\func findDec {A : \Type} (P : A -> Decide) (a : Array A) : Dec (∃ (j : Fin a.len) (P (a j))) =>
+  \case find P a \return Dec (∃ (j : Fin a.len) (P (a j))) \with {
+    | inl (j, p, _) => yes $ inP (j, p)
+    | inr f => no $ \lam (inP (j, p)) => f p
+  }
+
+\func intersectionArraySet {A : DecSet} (xs ys : ArraySet A) : ArraySet A \elim xs, ys
+  | in~ a, in~ b => in~ $ keep (\lam x => findDec (dec_decide $ decideEq x __) a) b
+  | in~ a, ~-equiv b1 b2 r => ~-pequiv $ \lam x =>
+    \let pred => \lam x => findDec (dec_decide $ decideEq x __) a \in (
+    \lam is-in => \case \elim is-in \with {
+      | inP (i, eq) =>
+        \let
+          | (j, eq-j) => keep.preimage i
+          | eq' => rewrite eq-j eq
+          | (inP (i2, eq2)) => (r x).1 $ inP (j, eq')
+          | q => keep.satisfies pred {b1} {i}
+          | q' => rewriteI eq2 $ rewrite eq q
+          | q'' => rewrite eq2 $ keep.element {_} {_} {pred} {_} {i2} q'
+        \in inP $ q''
+    },
+    -- NOTE: very similar to pred
+    \lam is-in => \case \elim is-in \with {
+      | inP (i, eq) =>
+        \let
+          | (j, eq-j) => keep.preimage i
+          | eq' => rewrite eq-j eq
+          | (inP (i1, eq1)) => (r x).2 $ inP (j, eq')
+          | q => keep.satisfies pred {b2} {i}
+          | q' => rewriteI eq1 $ rewrite eq q
+          | q'' => rewrite eq1 $ keep.element {_} {_} {pred} {_} {i1} q'
+        \in inP q''
+    })
+  | ~-equiv a1 a2 r, in~ b => ~-pequiv $ \lam x =>
+    \let pred a => \lam x => findDec (dec_decide $ decideEq x __) a \in (
+    \lam is-in => \case \elim is-in \with {
+      | inP (i, eq) =>
+        \let
+          | (j, eq-j) => keep.preimage i
+          | q => keep.satisfies (pred a1) {b} {i}
+          | (inP (k, eq-k)) => rewrite eq q
+          | (inP (i2, eq2)) => (r x).1 $ inP (k, inv eq-k)
+          | eq-j' => rewrite eq eq-j
+          | eq-j'' => rewriteI eq2 eq-j'
+          | q'' => rewriteI eq-j' $ keep.element {_} {_} {pred a2} {b} {j} $ inP (i2, inv eq-j'')
+        \in inP q''
+    },
+    -- NOTE: very similar to pred
+    \lam is-in => \case \elim is-in \with {
+      | inP (i, eq) =>
+        \let
+          | (j, eq-j) => keep.preimage i
+          | q => keep.satisfies (pred a2) {b} {i}
+          | (inP (k, eq-k)) => rewrite eq q
+          | (inP (i1, eq1)) => (r x).2 $ inP (k, inv eq-k)
+          | eq-j' => rewrite eq eq-j
+          | eq-j'' => rewriteI eq1 eq-j'
+          | q'' => rewriteI eq-j' $ keep.element {_} {_} {pred a1} {b} {j} $ inP (i1, inv eq-j'')
+        \in inP q''
+    })
 -- intersectionSet {ArraySetSet {A}} xs ys
 
 \func intersectionSet {A : DecSet} {S : FinSetSpec{A}} (s t : S) : S =>
