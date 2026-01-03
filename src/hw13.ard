@@ -1,6 +1,7 @@
 \import Algebra.Meta
-\import Data.Array (++, count, filter, find, keep)
+\import Data.Array (++, find, forall, keep, nub, toList)
 \import Data.Bool
+\import Data.List (length)
 \import Data.Or
 \import Equiv
 \import Function
@@ -279,9 +280,14 @@
 --    b) Определите функцию size из лекции
 --    c) Докажите, что size-le эквивалентно определению через size, если A -- разрешимо и S -- конечно
 
-\func size-le {S : SetSpec} (s : S) (n : Nat) : \Prop => {?}
+\func size-le {A : \Set} {S : SetSpec {A}} (s : S) (n : Nat) : \Prop \elim n
+  | 0 => s = empty
+  | suc n => ∃ (a : A) (∃ (s' : S) (\Sigma (s = add a s') (size-le s' n)))
 
-\func size {A : DecSet} {S : FinSetSpec {A}} (s : S) : Nat => {?}
+\func size {A : DecSet} {S : FinSetSpec {A}} (s : S) : Nat => \scase set-fin s \with {
+  | inP (a, f) => length $ toList $ nub a
+  | truncP (inP (a, f)) (inP (b, g)) => pmap length $ pmap toList $ ext {?}
+}
 
 -- Optional
 -- 8. Определите предикат isFin : \Type -> \Prop так,
